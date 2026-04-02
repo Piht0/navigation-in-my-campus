@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Макет главного экрана приложения.
+
+    ТОЧКИ РАСШИРЕНИЯ ДЛЯ UI:
+    - Заменить LinearLayout на ConstraintLayout для гибкости
+    - Добавить Toolbar / AppBar сверху
+    - Добавить BottomSheet для деталей маршрута
+    - Добавить FloatingActionButton для GPS
+    - Стилизовать кнопки (Material Design / кастомные стили)
+    - Добавить анимации переходов
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#FFFFFF">
+
+    <!-- Статусная строка с информацией о выбранных точках -->
+    <TextView
+        android:id="@+id/statusText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="8dp"
+        android:text="Режим: выбор точек | Нажмите на карту"
+        android:textSize="14sp"
+        android:textColor="#333333"
+        android:background="#F0F0F0"
+        android:gravity="center" />
+
+    <!-- Карта занимает всё доступное пространство -->
+    <com.campus.navigator.view.MapView
+        android:id="@+id/mapView"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+    <!-- Панель кнопок: строка 1 — основные -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="4dp"
+        android:background="#F5F5F5">
+
+        <Button
+            android:id="@+id/btnToggleImpassable"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Показать препятствия"
+            android:textSize="10sp"
+            android:layout_margin="2dp" />
+
+        <Button
+            android:id="@+id/btnToggleGrid"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Показать сетку"
+            android:textSize="10sp"
+            android:layout_margin="2dp" />
+
+        <Button
+            android:id="@+id/btnFindPath"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Найти путь"
+            android:textSize="10sp"
+            android:layout_margin="2dp" />
+
+        <Button
+            android:id="@+id/btnClear"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Очистить"
+            android:textSize="10sp"
+            android:layout_margin="2dp" />
+    </LinearLayout>
+
+    <!-- Панель кнопок: строка 2 — редактирование матрицы -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingStart="4dp"
+        android:paddingEnd="4dp"
+        android:paddingBottom="4dp"
+        android:background="#F5F5F5">
+
+        <Button
+            android:id="@+id/btnAddObstacle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="+ Препятствие"
+            android:textSize="10sp"
+            android:layout_margin="2dp" />
+
+        <Button
+            android:id="@+id/btnAddPassage"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="+ Проход"
+            android:textSize="10sp"
+            android:layout_margin="2dp" />
+
+        <Button
+            android:id="@+id/btnResetGrid"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Сброс матрицы"
+            android:textSize="10sp"
+            android:layout_margin="2dp" />
+    </LinearLayout>
+
+</LinearLayout>

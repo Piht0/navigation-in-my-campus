@@ -1,0 +1,41 @@
+1<?xml version="1.0" encoding="utf-8"?>
+2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+3    package="com.campus.navigator"
+4    android:versionCode="1"
+5    android:versionName="0.1.0-prototype" >
+6
+7    <uses-sdk
+8        android:minSdkVersion="24"
+9        android:targetSdkVersion="34" />
+10
+11    <application
+11-->C:\Users\pihto\Downloads\app\CampusNavigator\app\src\main\AndroidManifest.xml:4:5-18:19
+12        android:debuggable="true"
+13        android:extractNativeLibs="false"
+14        android:label="@string/app_name"
+14-->C:\Users\pihto\Downloads\app\CampusNavigator\app\src\main\AndroidManifest.xml:5:9-41
+15        android:testOnly="true"
+16        android:theme="@android:style/Theme.DeviceDefault.Light.NoActionBar" >
+16-->C:\Users\pihto\Downloads\app\CampusNavigator\app\src\main\AndroidManifest.xml:6:9-77
+17        <activity
+17-->C:\Users\pihto\Downloads\app\CampusNavigator\app\src\main\AndroidManifest.xml:8:9-16:20
+18            android:name="com.campus.navigator.MainActivity"
+18-->C:\Users\pihto\Downloads\app\CampusNavigator\app\src\main\AndroidManifest.xml:9:13-61
+19            android:exported="true"
+19-->C:\Users\pihto\Downloads\app\CampusNavigator\app\src\main\AndroidManifest.xml:10:13-36
+20            android:screenOrientation="portrait" >
+20-->C:\Users\pihto\Downloads\app\CampusNavigator\app\src\main\AndroidManifest.xml:11:13-49
+21            <intent-filter>
+21-->C:\Users\pihto\Downloads\app\CampusNavigator\app\src\main\AndroidManifest.xml:12:13-15:29
+22                <action android:name="android.intent.action.MAIN" />
+22-->C:\Users\pihto\Downloads\app\CampusNavigator\app\src\main\AndroidManifest.xml:13:17-69
+22-->C:\Users\pihto\Downloads\app\CampusNavigator\app\src\main\AndroidManifest.xml:13:25-66
+23
+24                <category android:name="android.intent.category.LAUNCHER" />
+24-->C:\Users\pihto\Downloads\app\CampusNavigator\app\src\main\AndroidManifest.xml:14:17-77
+24-->C:\Users\pihto\Downloads\app\CampusNavigator\app\src\main\AndroidManifest.xml:14:27-74
+25            </intent-filter>
+26        </activity>
+27    </application>
+28
+29</manifest>

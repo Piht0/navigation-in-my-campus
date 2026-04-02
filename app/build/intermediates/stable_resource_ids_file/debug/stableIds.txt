@@ -1,0 +1,12 @@
+com.campus.navigator:id/statusText = 0x7f020008
+com.campus.navigator:id/mapView = 0x7f020007
+com.campus.navigator:string/app_name = 0x7f040000
+com.campus.navigator:id/btnToggleGrid = 0x7f020005
+com.campus.navigator:id/btnAddObstacle = 0x7f020000
+com.campus.navigator:id/btnResetGrid = 0x7f020004
+com.campus.navigator:id/btnClear = 0x7f020002
+com.campus.navigator:drawable/campus_map = 0x7f010000
+com.campus.navigator:id/btnAddPassage = 0x7f020001
+com.campus.navigator:layout/activity_main = 0x7f030000
+com.campus.navigator:id/btnToggleImpassable = 0x7f020006
+com.campus.navigator:id/btnFindPath = 0x7f020003
