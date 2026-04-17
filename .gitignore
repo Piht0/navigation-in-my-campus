@@ -1,0 +1,8 @@
+# Project exclude paths
+/.gradle/
+/app/build/
+/build/
+local.properties
+.idea/
+.claude/
+CODE_COMMENTS.txt

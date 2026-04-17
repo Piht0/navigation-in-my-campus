@@ -1,0 +1,492 @@
+CAMPUSNAVIGATOR — ДОКУМЕНТАЦИЯ
+================================
+
+Навигатор кампуса ТГУ. Android Kotlin, без сторонних библиотек (только AndroidX + Material).
+Карта: 790×1664 клеток, матрица проходимости в битовом ByteArray (~164 КБ).
+
+
+═══════════════════════════════════════════════════════
+ ДАННЫЕ И ПЕРСИСТЕНТНОСТЬ
+═══════════════════════════════════════════════════════
+
+MapData.kt — singleton хранилище состояния карты
+-------------------------------------------------
+Хранит:
+  - baseGrid: ByteArray — базовая матрица проходимости (биты), 1 = проходимо
+  - modifiedCells: HashMap<Int, Boolean> — пользовательские правки клеток
+  - foodPoints: список точек питания (FoodPoint)
+  - landmarks: список достопримечательностей (Landmark)
+
+Инициализация: загружает бинарный кэш passability_matrix.bin (если есть),
+  иначе парсит passability_matrix.csv из assets и создаёт бинарный кэш.
+
+Ключевые методы:
+  isPassable(row, col)       — проходимость с учётом пользовательских правок
+  isBasePassable(row, col)   — проходимость только базовой матрицы
+  isModified(row, col)       — клетка изменена относительно базы
+  setObstacle / setPassage   — добавить пользовательское препятствие/проход
+  addFoodPoint / removeFoodPoint / getFoodPointAt
+  addLandmark / removeLandmark / getLandmarkAt
+  getLandmarks() — возвращает .toList() (защита от ConcurrentModificationException
+    при фоновом обходе в precomputeLandmarkMatrix)
+  getFoodPoints() — возвращает прямую ссылку (все вызовы на UI-потоке)
+
+Модели данных:
+  FoodPoint(row, col, name, review, tags, clusterId, dbId)
+  Landmark(row, col, name)
+
+
+FoodRepository.kt — репозиторий заведений и блюд
+-------------------------------------------------
+Хранение: SharedPreferences "food_data" + JSON (ключи: food_points, dishes, links).
+Все данные держатся в памяти; SharedPreferences — дисковый бэкап.
+Чтение быстрое (in-memory), запись асинхронна через apply().
+
+Структура:
+  foodPoints: List<FoodPointData>  — заведения
+  dishes:     List<DishData>       — справочник блюд
+  links:      List<Pair<Long,Long>> — связи многие-ко-многим (fpId, dishId)
+
+Ключевые методы:
+  getAllOnMap()              — заведения с isOnMap=true
+  getByCoords(row, col)     — поиск по координатам
+  insertFoodPoint(...)      — добавить, возвращает id
+  updateFoodPoint(fp)       — обновить
+  deleteFoodPointById(id)   — удалить вместе со связями
+  insertLink / clearLinks / getLinkedDishes(fpId)
+  findOnMapByDishIds(dishIds) — заведения на карте, у которых есть хоть одно блюдо из списка
+  getAllWithDishes()         — все заведения с их блюдами, отсортированные по имени
+
+FoodPointData(id, row, col, name, review, tags, isOnMap)
+  id      — уникальный ID (генерируется репозиторием)
+  isOnMap — false: скрыта с карты, но сохранена в БД
+
+
+═══════════════════════════════════════════════════════
+ АЛГОРИТМЫ
+═══════════════════════════════════════════════════════
+
+PathFinder.kt — A* поиск пути
+------------------------------
+Singleton, @Synchronized (переиспользует массивы gScore, parentIdx, visitedArr).
+8-связная сетка: 4 прямых (стоимость 1.0) + 4 диагональных (стоимость 1.4142).
+
+Эвристика (октильная):
+  h = 1*(dr+dc) + (1.4142 - 2)*min(dr,dc)
+
+Оптимизации памяти:
+  - touchedIndices: список только задействованных клеток — resetTouched() сбрасывает
+    только их, не весь массив (1.3 млн элементов)
+  - ensureArrays(): пересоздаёт массивы только при изменении размеров карты
+
+Анимационные события (animEvents: IntArray):
+  idx >= 0  → OPEN  (ячейка добавлена в frontier, idx = row*COLS+col)
+  idx < 0   → CLOSE (ячейка перешла в closed,    idx = -(row*COLS+col) - 1)
+
+Методы:
+  findPath(start, end): PathResult
+    - Полный A*: путь + анимационные события. Выполняется на UI-потоке.
+  findPathCost(start, end): Float
+    - Только стоимость, без восстановления пути. Используется для матриц GA/ACO.
+  findPathMulti(start, waypoints): List<Cell>
+    - A* через несколько точек последовательно (snap каждой точки к проходимой).
+  nearestPassable(row, col, maxRadius=40): Cell?
+    - BFS к ближайшей проходимой клетке. Заведения могут стоять на стенах.
+
+
+GeneticRouteSolver.kt — Генетический алгоритм (открытый TSP)
+-------------------------------------------------------------
+Задача: посетить все точки питания ровно по одному разу из фиксированного старта,
+минимизировать суммарное расстояние. Маршрут открытый (без возврата).
+
+Параметры:
+  POPULATION_SIZE = 100
+  GENERATIONS     = 300
+  MUTATION_RATE   = 0.02  (2%)
+  TOURNAMENT_K    = 5
+  PROGRESS_EVERY  = 30    (колбэк каждые N поколений)
+
+Операторы:
+  - Tournament selection: выбирает лучшего из K случайных особей
+  - OX crossover (Order Crossover): сохраняет отрезок родителя-1, дополняет порядком родителя-2
+  - Swap mutation: с вероятностью MUTATION_RATE меняет два гена местами
+
+Оптимизации:
+  - fitness[]: кэш длин маршрутов — не пересчитывать routeLen при каждом tournament()
+  - seenArr: BooleanArray(n) переиспользуется в OX без HashSet аллокаций
+    (сброс только помеченных lo..hi элементов, не fill)
+  - globalBest: отслеживает all-time лучшую особь (мутация может «потерять» хорошую)
+
+Вход: solveWithMatrix(n, startDists, distMatrix, onProgress?)
+  startDists  — A* стоимость от старта до каждой точки
+  distMatrix  — симметричная матрица A* стоимостей между точками
+  onProgress  — колбэк (indices, dist) каждые PROGRESS_EVERY поколений
+
+
+AntColonySolver.kt — Муравьиный алгоритм (открытый TSP)
+--------------------------------------------------------
+Стратегия: Elitist Ant System.
+
+Параметры:
+  N_ANTS         = 25
+  N_ITERATIONS   = 180
+  ALPHA          = 1.0   (вес феромона)
+  BETA           = 4.0   (вес эвристики)
+  RHO            = 0.15  (коэффициент испарения)
+  Q              = 100.0 (количество феромона за маршрут)
+  ELITIST_WEIGHT = 3.0   (множитель для лучшего маршрута)
+
+Формула вероятности перехода i→j:
+  p(i→j) = [τ(i,j)^α · η(i,j)^β] / Σ_k [τ(i,k)^α · η(i,k)^β]
+  где η(i,j) = 1/dist(i,j)
+
+Цикл:
+  1. Каждый муравей строит маршрут через roulette selection
+  2. Испарение: τ[i][j] *= (1 - RHO), минимум 1e-6
+  3. Все муравьи откладывают феромон: Q / длина_маршрута
+  4. Лучший маршрут дополнительно: Q * ELITIST_WEIGHT / bestLen
+
+Оптимизации:
+  - visited, route, firstProbs, probs — pre-allocated, переиспользуются
+  - visited.fill(false) вместо new BooleanArray(n) каждый раз
+  - ALPHA=1.0 → tau^1 = tau (без Math.pow)
+  - BETA=4.0  → eta^4 = e*e*e*e (без Math.pow)
+  - etaStartB — предвычисленный массив etaStart^4
+
+rouletteSelect: если все вероятности 0 — случайный индекс (fallback при недостижимых парах)
+
+
+KMeansClusterer.kt — Кластеризация (Union-Find по расстоянию)
+-------------------------------------------------------------
+Название историческое — реально это Union-Find кластеризация, не K-Means.
+
+DEFAULT_MAX_DIST = 135f — порог объединения двух точек в один кластер.
+
+Алгоритм:
+  1. O(n²) перебор всех пар точек питания
+  2. Если dist(i,j) ≤ maxDist → union(i, j)
+  3. Нормализация корней Union-Find в последовательные ID (0, 1, 2...)
+  4. Вычисление центроидов каждого кластера
+  5. singletonIds: кластеры из одной точки (аутлайеры)
+
+find() с компрессией пути для ускорения Union-Find.
+
+Результат: ClusterResult(assignments, centroids, singletonIds)
+  assignments  — Map<Pair<Int,Int>, Int>: точка → ID кластера
+  centroids    — List<Pair<Float,Float>>: центр каждого кластера
+  singletonIds — Set<Int>: одиночки (рисуются оранжевым без blob-зоны)
+
+
+═══════════════════════════════════════════════════════
+ МАШИННОЕ ОБУЧЕНИЕ
+═══════════════════════════════════════════════════════
+
+ID3Algorithm.kt — Дерево решений ID3
+--------------------------------------
+Iterative Dichotomiser 3 — классическое дерево на основе Information Gain.
+TARGET = "recommended_place" — целевой признак.
+
+Построение дерева buildTree(samples, features):
+  Базовые случаи:
+    - Все примеры одного класса → Leaf(label, count)
+    - Нет признаков / пустая выборка → Leaf(majority, count)
+  Иначе:
+    - Выбрать признак с max IG: maxByOrNull { infoGain(samples, it) }
+    - Для каждого значения признака — рекурсия на подвыборке
+
+Формулы:
+  H(S)     = −Σ_c (|S_c|/|S|) · log₂(|S_c|/|S|)   (энтропия Шеннона)
+  IG(S, A) = H(S) − Σ_v (|S_v|/|S|) · H(S_v)       (прирост информации)
+
+Предсказание predict(node, input):
+  - Обход сверху вниз по значениям признаков
+  - Fallback: если значение не найдено — первая дочерняя ветка
+  - Возвращает (predicted_label, path: List<"признак = значение">)
+
+Вспомогательные:
+  depth(node)                            — глубина дерева (корень=0)
+  featureValues(samples, feature)        — уникальные значения признака
+  infoGain(samples, feature): Double     — IG для признака
+
+
+DecisionTreeNode.kt — Узлы дерева решений
+------------------------------------------
+sealed class DecisionTreeNode — закрытая иерархия:
+  Branch(feature: String, children: LinkedHashMap<String, DecisionTreeNode>)
+    - Внутренний узел; LinkedHashMap сохраняет порядок вставки (для HTML)
+  Leaf(label: String, count: Int)
+    - Лист: label = рекомендованное заведение, count = число примеров
+
+
+DecisionTreeViewModel.kt
+------------------------
+Хранит: обученное дерево (tree), обучающую выборку (samples).
+Персистентность: SharedPreferences "decision_tree", ключ "decision_tree_dataset".
+При создании: init { loadSaved() } — автозагрузка и переобучение.
+
+Признаки модели (FEATURES):
+  location, budget, time_available, food_type, queue_tolerance, weather
+
+DEFAULT_VALUES — значения спиннеров до загрузки датасета.
+
+Методы:
+  loadAndTrain(csvText)    — парсит CSV, обучает ID3, возвращает статус
+  getSavedCsv()            — сохранённый CSV или образец из assets
+  valuesFor(feature)       — уникальные значения из датасета (или DEFAULT_VALUES)
+  predict(input)           — прогнать по дереву, Pair(заведение, путь) или null
+  generateTreeHtml()       — HTML-визуализация для WebView (ul/li с CSS, JS отключён)
+  calcLocation(studentRow, studentCol, centroids) — категория location по расстоянию
+    ≤150 клеток → "close", ≤300 → "medium", >300 → "far"
+
+parseCSV: заголовки в первой строке, TARGET обязателен, строки с другим числом
+  полей пропускаются.
+
+HTML-стили: узлы-ветки синие (#0057A8), листья тёмно-синие (#003D7A).
+
+
+DigitRecognizer.kt — Нейросеть распознавания цифр
+--------------------------------------------------
+Произвольная глубина Dense-слоёв: ReLU на всех кроме последнего, Softmax на последнем.
+gridSize берётся из JSON (обычно 5, соответствует DigitDrawView.GRID).
+
+Формат assets/digit_weights.json:
+  {"grid": 5, "layers": [{"w": [[...]], "b": [...]}, ...]}
+
+Прямой проход:
+  Dense:     out[j] = Σ_i x[i]*w[i][j] + b[j]
+  ReLU:      out[i] = max(0, out[i])
+  Softmax:   exp(logit - max) / Σ exp  (numerically stable)
+
+init(context) — безопасен к повторному вызову (проверяет isReady).
+predict(pixels) → Pair(digit 0-9, confidence) или null если не готов.
+Формат pixels: FloatArray(GRID*GRID), 1.0=фон, 0.0=нарисовано.
+
+
+═══════════════════════════════════════════════════════
+ UI КОМПОНЕНТЫ
+═══════════════════════════════════════════════════════
+
+MapView.kt — кастомный View карты
+----------------------------------
+Кастомный View карты кампуса с жестами и всеми слоями отрисовки.
+
+Трансформация:
+  matrix      — «bitmap → экран» (scale + translate)
+  invertMatrix — «экран → bitmap» (пересчитывается при каждом изменении matrix)
+  Обновляется при pan, pinch-zoom, SeekBar.
+
+Жесты:
+  1 палец       → перетаскивание (postTranslate)
+  2 пальца      → масштабирование вокруг mid-point + pan
+  TAP_THRESHOLD = 12px — максимальное смещение для тапа
+  isPainting    — drag в режиме ADD_OBSTACLE/ADD_PASSAGE (не вызывает handleTap)
+
+Порядок слоёв в onDraw (снизу вверх):
+  1. Растровая подложка (campus_map.jpg, RGB_565)
+  2. impassableBitmap — слой непроходимых клеток (строится в фоне)
+  3. Изменённые клетки (зелёные проходы / тёмно-красные препятствия)
+  4. animClosedCells (голубые) + animFrontierCells (оранжевые) — анимация A*
+  5. currentPath (жёлтые клетки) — финальный путь
+  6. Сетка клеток (если showGrid=true)
+  7. Зоны кластеров (saveLayer + blob-заливка кругами)
+  8. Круги точек питания (большой + маленькая центральная точка)
+  9. Круги достопримечательностей (на треть меньше точек питания)
+  10. ACO маршрут (светло-зелёные клетки + нумерованные маркеры)
+  11. Кольца-подсветки найденных заведений (поиск по блюдам)
+  12. Маршрут заведений (A*-ячейки или fallback: прямые линии + нумерованные маркеры)
+  13. Маркеры старта (зелёный) и финиша (красный)
+  OVERLAY: кнопка «✕ кластеры» в экранных координатах
+
+Оптимизации:
+  - getVisibleRect(cw, ch): рисует только видимые клетки
+  - impassableBitmap: строится один раз в фоне (buildImpassableBitmapAsync)
+  - clusterGroups: HashMap кэш, пересобирается только при смене clusterAssignments
+  - density, resetBtnW/H: вычисляются один раз в init{}
+  - campus_map загружается с inSampleSize ≤ 2048px, Config=RGB_565
+
+Анимация A*:
+  startPathAnimation(animEvents, finalPath, distanceHint):
+    targetMs = distanceHint*4, зажато в [800, 5000] мс
+    batchSize = animEvents.size / totalFrames, минимум 1
+    animHandler (Handler/Runnable) — кадры каждые ANIM_DELAY_MS=16 мс
+    После завершения: пауза ANIM_PATH_DELAY_MS=250 мс → показ финального пути
+  cancelAnimation(): сбрасывает все состояния анимации
+
+Кластерные зоны:
+  CLUSTER_ZONE_ALPHA = 125 (~49% непрозрачности)
+  saveLayer для каждого кластера (только в его bounding box + blobRadius)
+  blobRadius = maxOf(cw, ch) * 3.6f
+  Одиночки (singletonIds) не получают blob-зону
+
+Колбэки:
+  onCellTapped(row, col)       — тап по клетке в режиме NONE
+  onLandmarkTapped(row, col)   — тап по кружку достопримечательности
+  onLandmarkChanged()          — добавление/удаление достопримечательности
+  onFoodPointToggled(row, col, added) — ADD_FOOD_POINT режим
+  onResetClusters()            — нажатие кнопки «✕ кластеры»
+  onMatrixReset()              — сброс матрицы (для синхронизации SeekBar)
+
+Публичный API:
+  applyZoomFromCenter(factor)  — масштабирование из центра View (SeekBar)
+  centerOnCell(row, col)       — центрировать камеру на клетке
+
+
+DigitDrawView.kt — сетка для рисования цифры
+---------------------------------------------
+GRID = 5 (5×5 клеток).
+cells[r][c]: true = закрашено, false = пусто.
+
+Рисование пальцем:
+  ACTION_DOWN: переключить клетку, запомнить paintValue (направление)
+  ACTION_MOVE: закрашивать/стирать в том же направлении (lastToggledRow/Col)
+  Защита от повторной обработки одной клетки.
+
+getPixels(): FloatArray(GRID*GRID)
+  1.0 = закрашено (цифра), 0.0 = пусто (фон) — формат для DigitRecognizer
+  (противоположен хранению в cells)
+clear(): сбросить все клетки в false
+hasDrawing(): хотя бы одна клетка закрашена
+
+
+═══════════════════════════════════════════════════════
+ ЭКРАНЫ
+═══════════════════════════════════════════════════════
+
+MainActivity.kt — главный экран
+--------------------------------
+Управляет картой, точками питания, достопримечательностями, маршрутами.
+
+Состояние:
+  tapPhase:            0=ожидание старта, 1=ожидание финиша маршрута
+  lastSliderZoom:      последнее значение SeekBar для вычисления relative factor
+  landmarkDistCache:   @Volatile кэш A* матрицы достопримечательностей
+  matrixComputeThread: @Volatile фоновый поток вычисления матрицы
+
+SeekBar:
+  progressToZoom(p) = 0.5 * 2^(p/25) — экспоненциальная шкала, p=25 → 1.0
+  onProgressChanged: factor = newZoom / lastSliderZoom → applyZoomFromCenter
+
+Поиск пути A*:
+  handleMapTap: tapPhase 0→1 (старт) → 1→0 (финиш)
+  findPath(): PathFinder.findPath() + startPathAnimation(animEvents, path, dist)
+  dist — октильное расстояние старт→финиш (управляет скоростью анимации)
+
+Маршрут GA (buildRoute):
+  1. nearestPassable для каждой точки и старта (snap)
+  2. Матрица A* стоимостей: O(n² + n) вызовов findPathCost
+  3. GeneticRouteSolver.solveWithMatrix с onProgress-колбэком
+     (каждые 30 поколений → обновление routeFoodPoints на экране)
+  4. PathFinder.findPathMulti по финальному порядку → routeAStarPath
+
+Фильтрация заведений (filterRestaurantsForRoute):
+  maxPerDish = 3 — максимум заведений на одно блюдо
+  Сортировка: по охвату блюд ↓, по расстоянию до старта ↑
+  Жадный отбор пока каждое блюдо не покрыто maxPerDish заведениями
+
+Матрица достопримечательностей (precomputeLandmarkMatrix):
+  Вычисляется проактивно в фоне при каждом изменении списка.
+  matrixComputeThread?.interrupt() при повторном вызове.
+  Кэш: LandmarkDistCache(snapStart, snapLMs, startDists, distMatrix)
+
+Маршрут ACO (buildAcoRoute):
+  Ждёт matrixComputeThread.join() если матрица ещё считается.
+  Вырезает подматрицу только для выбранных достопримечательностей.
+  AntColonySolver.solve() → PathFinder.findPathMulti → landmarkAStarPath
+
+Определение старта (getStartCell):
+  Приоритет: startCell (выбранная пользователем) → GPS → центр карты.
+  GPS: getLastKnownLocation — заглушка, возвращает центр карты.
+
+Персистентность достопримечательностей:
+  SharedPreferences "landmarks", ключ "data", формат JSON:
+  [{"row":123, "col":456, "name":"Фонтан"}, ...]
+
+BottomSheet меню (openFoodMenu):
+  Добавить точку, Достопримечательность, Список достопримечательностей,
+  ACO маршрут, Кластеризация, Заведения, Блюда, Дерево решений, Поиск по блюдам,
+  Сбросить маршрут.
+
+
+DigitActivity.kt — экран нейросети
+------------------------------------
+5×5 сетка для рисования цифры.
+Авто-распознавание при onGridChanged если DigitRecognizer.isReady.
+DigitRecognizer.init() вызывается в фоне при старте если !isReady.
+recognize(): getPixels() → DigitRecognizer.predict() → tvResult/tvConfidence.
+
+
+DecisionTreeActivity.kt — экран дерева решений
+------------------------------------------------
+Две вкладки: «Обучение» и «Найти место».
+
+Вкладка «Обучение»:
+  EditText для CSV; при старте загружается getSavedCsv().
+  «Образец» → getSavedCsv() в EditText.
+  «Обучить» → vm.loadAndTrain() в Thread → refreshTreeVisualization() + refreshSpinners().
+  WebView (JS отключён): loadDataWithBaseURL с HTML от generateTreeHtml().
+
+Вкладка «Найти место»:
+  6 спиннеров по FEATURES; значения из vm.valuesFor(feature).
+  «Найти» → vm.predict(input) → tvResult + путь по дереву.
+  Путь: TextView для каждого шага + TextView «↓» между шагами.
+  Итоговый лист: жирный синий TextView «→ Название».
+
+refreshSpinners(): пересоздаёт ArrayAdapter для всех 6 спиннеров.
+При старте: если vm.tree != null → обновить tvStatus + visualize + spinners.
+
+
+═══════════════════════════════════════════════════════
+ СИНТАКСИС И ПАТТЕРНЫ KOTLIN/ANDROID В ПРОЕКТЕ
+═══════════════════════════════════════════════════════
+
+object — singleton:
+  object MapData { ... }  →  MapData.getFoodPoints()  (без new)
+  Инициализируется лениво при первом обращении.
+
+data class — модель данных:
+  Автоматически генерирует equals, hashCode, toString, copy.
+  val — неизменяемое поле, var — изменяемое.
+
+sealed class — закрытая иерархия:
+  sealed class DecisionTreeNode { class Branch...; class Leaf... }
+  С when — компилятор требует обработать каждый вариант (без else).
+
+@Volatile + Thread — фоновые вычисления:
+  @Volatile — видимость переменной между потоками (без CPU-кэша).
+  val t = Thread { /* тяжёлые вычисления */ }; t.isDaemon = true; t.start()
+  runOnUiThread { updateStatus("...") } — изменение View только на UI-потоке.
+
+@Synchronized — защита от гонок:
+  PathFinder переиспользует массивы — без синхронизации два потока смешают данные.
+
+Лямбды:
+  var onCellTapped: ((row: Int, col: Int) -> Unit)? = null
+  Вызов: onCellTapped?.invoke(row, col)
+  Trailing lambda: GeneticRouteSolver.solveWithMatrix(...) { indices, dist -> ... }
+
+apply — настройка объекта при создании:
+  val paint = Paint().apply { color = Color.RED; style = Paint.Style.FILL }
+
+let / ?. / ?: — безопасная работа с null:
+  mapBitmap?.let { canvas.drawBitmap(it, 0f, 0f, bitmapPaint) }
+  matrix?.invert(invertMatrix)
+  val snap = nearestPassable(c.row, c.col) ?: c
+
+companion object — статические члены:
+  companion object { val FEATURES = listOf(...) }
+  Доступ: DecisionTreeViewModel.FEATURES
+
+enum class — перечисление:
+  enum class EditMode { NONE, ADD_OBSTACLE, ADD_PASSAGE, ADD_FOOD_POINT, ADD_LANDMARK }
+
+lateinit var — отложенная инициализация View:
+  private lateinit var mapView: MapView  (инициализируется в onCreate)
+
+FloatArray / IntArray / BooleanArray — примитивные массивы без boxing:
+  PathFinder: gScore, parentIdx, visitedArr — 1.3 млн элементов каждый.
+
+SharedPreferences — персистентность без БД:
+  prefs.edit().putString("key", value).apply()  // асинхронно
+  prefs.getString("key", null)                   // чтение
+
+⚠️  TODO ПЕРЕД СДАЧЕЙ: убрать println() из AntColonySolver.kt (строки ~24 и ~118)

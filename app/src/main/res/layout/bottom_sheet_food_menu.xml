@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@color/bg_white">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingBottom="24dp">
+
+        <!-- Drag handle -->
+        <View
+            android:layout_width="40dp"
+            android:layout_height="4dp"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="10dp"
+            android:layout_marginBottom="8dp"
+            android:background="@color/divider" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingHorizontal="16dp"
+            android:paddingBottom="4dp"
+            android:text="Управление питанием"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:textColor="@color/tsu_blue_dark" />
+
+        <!-- === НА КАРТЕ === -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingHorizontal="16dp"
+            android:paddingTop="10dp"
+            android:paddingBottom="2dp"
+            android:text="НА КАРТЕ"
+            android:textSize="11sp"
+            android:textColor="@color/text_hint" />
+
+        <Button
+            android:id="@+id/btnSheetAddFoodPoint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="12dp"
+            android:layout_marginTop="4dp"
+            android:text="Добавить / убрать точку на карте"
+            android:textSize="13sp"
+            android:backgroundTint="@color/tsu_blue"
+            android:textColor="@color/bg_white" />
+
+        <Button
+            android:id="@+id/btnSheetAddLandmark"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="12dp"
+            android:layout_marginTop="4dp"
+            android:text="Расставить достопримечательности"
+            android:textSize="13sp"
+            android:backgroundTint="@color/tsu_blue_dark"
+            android:textColor="@color/bg_white" />
+
+        <Button
+            android:id="@+id/btnSheetLandmarkList"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="12dp"
+            android:layout_marginTop="4dp"
+            android:text="Список достопримечательностей"
+            android:textSize="13sp"
+            android:backgroundTint="@color/tsu_blue_dark"
+            android:textColor="@color/bg_white" />
+
+        <Button
+            android:id="@+id/btnSheetAcoRoute"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="12dp"
+            android:layout_marginTop="4dp"
+            android:text="Маршрут по достопримечательностям (ACO)"
+            android:textSize="13sp"
+            android:backgroundTint="@color/tsu_blue"
+            android:textColor="@color/bg_white" />
+
+        <Button
+            android:id="@+id/btnSheetClustering"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="12dp"
+            android:layout_marginTop="4dp"
+            android:text="Кластеризация заведений"
+            android:textSize="13sp"
+            android:backgroundTint="@color/tsu_blue"
+            android:textColor="@color/bg_white" />
+
+        <!-- === ЗАВЕДЕНИЯ И БЛЮДА === -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingHorizontal="16dp"
+            android:paddingTop="14dp"
+            android:paddingBottom="2dp"
+            android:text="ЗАВЕДЕНИЯ И БЛЮДА"
+            android:textSize="11sp"
+            android:textColor="@color/text_hint" />
+
+        <Button
+            android:id="@+id/btnSheetRestaurants"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="12dp"
+            android:layout_marginTop="4dp"
+            android:text="Список заведений"
+            android:textSize="13sp"
+            android:backgroundTint="@color/tsu_blue"
+            android:textColor="@color/bg_white" />
+
+        <Button
+            android:id="@+id/btnSheetDishes"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="12dp"
+            android:layout_marginTop="4dp"
+            android:text="Управление блюдами"
+            android:textSize="13sp"
+            android:backgroundTint="@color/tsu_blue_dark"
+            android:textColor="@color/bg_white" />
+
+        <!-- === АНАЛИТИКА === -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingHorizontal="16dp"
+            android:paddingTop="14dp"
+            android:paddingBottom="2dp"
+            android:text="АНАЛИТИКА"
+            android:textSize="11sp"
+            android:textColor="@color/text_hint" />
+
+        <Button
+            android:id="@+id/btnSheetDecisionTree"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="12dp"
+            android:layout_marginTop="4dp"
+            android:text="Дерево решений (рекомендация)"
+            android:textSize="13sp"
+            android:backgroundTint="@color/tsu_blue"
+            android:textColor="@color/bg_white" />
+
+        <!-- === ПОИСК И МАРШРУТ === -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingHorizontal="16dp"
+            android:paddingTop="14dp"
+            android:paddingBottom="2dp"
+            android:text="ПОИСК И МАРШРУТ"
+            android:textSize="11sp"
+            android:textColor="@color/text_hint" />
+
+        <Button
+            android:id="@+id/btnSheetDishSearch"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="12dp"
+            android:layout_marginTop="4dp"
+            android:text="Поиск по блюду + маршрут"
+            android:textSize="13sp"
+            android:backgroundTint="@color/tsu_blue"
+            android:textColor="@color/bg_white" />
+
+        <Button
+            android:id="@+id/btnSheetClearRoute"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="12dp"
+            android:layout_marginTop="4dp"
+            android:text="Сбросить маршрут и подсветку"
+            android:textSize="13sp"
+            android:backgroundTint="@color/bg_gray"
+            android:textColor="@color/text_primary" />
+
+    </LinearLayout>
+</ScrollView>

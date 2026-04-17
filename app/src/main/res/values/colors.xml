@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Фирменный стиль ТГУ — Pantone 2935 C -->
+    <color name="tsu_blue">#0057A8</color>
+    <color name="tsu_blue_dark">#003D7A</color>
+    <color name="tsu_blue_light">#E8F0FA</color>
+
+    <!-- Нейтральные -->
+    <color name="bg_gray">#F2F4F7</color>
+    <color name="bg_white">#FFFFFF</color>
+    <color name="divider">#DDDDDD</color>
+    <color name="text_primary">#1C1C1E</color>
+    <color name="text_secondary">#6B6B6B</color>
+    <color name="text_hint">#AAAAAA</color>
+
+    <!-- Акцент -->
+    <color name="danger">#C0392B</color>
+    <color name="danger_light">#FDECEA</color>
+</resources>

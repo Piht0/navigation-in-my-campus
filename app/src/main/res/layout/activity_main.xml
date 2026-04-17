@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/bg_gray">
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <com.campus.navigator.MapView
+            android:id="@+id/mapView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="#E8F0E8" />
+
+        <SeekBar
+            android:id="@+id/seekZoom"
+            android:layout_width="260dp"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_vertical|end"
+            android:layout_marginEnd="-62dp"
+            android:rotation="270"
+            android:max="175"
+            android:progress="25"
+            android:progressTint="#AA0057A8"
+            android:thumbTint="@color/tsu_blue" />
+
+        <!-- Кнопка открытия меню управления питанием -->
+        <Button
+            android:id="@+id/btnOpenFoodMenu"
+            android:layout_width="56dp"
+            android:layout_height="56dp"
+            android:layout_gravity="bottom|start"
+            android:layout_margin="12dp"
+            android:text="☰"
+            android:textSize="22sp"
+            android:textColor="@color/bg_white"
+            android:backgroundTint="@color/tsu_blue"
+            android:padding="0dp"
+            android:elevation="6dp" />
+
+    </FrameLayout>
+
+    <!-- Статусная строка -->
+    <TextView
+        android:id="@+id/tvStatus"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="8dp"
+        android:textSize="12sp"
+        android:textColor="@color/tsu_blue_dark"
+        android:background="@color/tsu_blue_light"
+        android:minLines="2"
+        android:maxLines="2"
+        android:ellipsize="end"
+        android:text="Нажмите на карту для установки начальной точки" />
+
+    <!-- Панель 1: путь и отображение -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="4dp"
+        android:background="@color/bg_white">
+
+        <Button
+            android:id="@+id/btnToggleImpassable"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_margin="2dp"
+            android:text="Матрица"
+            android:textSize="11sp"
+            android:padding="4dp"
+            android:backgroundTint="@color/bg_gray"
+            android:textColor="@color/text_primary" />
+
+        <Button
+            android:id="@+id/btnToggleGrid"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_margin="2dp"
+            android:text="Сетка"
+            android:textSize="11sp"
+            android:padding="4dp"
+            android:backgroundTint="@color/bg_gray"
+            android:textColor="@color/text_primary" />
+
+        <Button
+            android:id="@+id/btnFindPath"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_margin="2dp"
+            android:text="Найти путь"
+            android:textSize="11sp"
+            android:padding="4dp"
+            android:backgroundTint="@color/tsu_blue"
+            android:textColor="@color/bg_white" />
+
+        <Button
+            android:id="@+id/btnClear"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_margin="2dp"
+            android:text="Очистить"
+            android:textSize="11sp"
+            android:padding="4dp"
+            android:backgroundTint="@color/danger"
+            android:textColor="@color/bg_white" />
+    </LinearLayout>
+
+    <!-- Панель 2: редактирование -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="4dp"
+        android:background="@color/bg_gray">
+
+        <Button
+            android:id="@+id/btnAddObstacle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_margin="2dp"
+            android:text="Препятствие"
+            android:textSize="11sp"
+            android:padding="4dp"
+            android:backgroundTint="@color/tsu_blue_dark"
+            android:textColor="@color/bg_white" />
+
+        <Button
+            android:id="@+id/btnAddPassage"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_margin="2dp"
+            android:text="Проход"
+            android:textSize="11sp"
+            android:padding="4dp"
+            android:backgroundTint="@color/tsu_blue"
+            android:textColor="@color/bg_white" />
+
+        <Button
+            android:id="@+id/btnResetGrid"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_margin="2dp"
+            android:text="Сброс"
+            android:textSize="11sp"
+            android:padding="4dp"
+            android:backgroundTint="@color/bg_gray"
+            android:textColor="@color/text_primary" />
+
+        <Button
+            android:id="@+id/btnAddLandmark"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_margin="2dp"
+            android:text="Достопримеч."
+            android:textSize="11sp"
+            android:padding="4dp"
+            android:backgroundTint="@color/tsu_blue"
+            android:textColor="@color/bg_white" />
+    </LinearLayout>
+
+</LinearLayout>

@@ -1,0 +1,328 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/bg_gray">
+
+    <!-- Шапка -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/tsu_blue_dark">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp"
+            android:paddingEnd="48dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Дерево решений"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                android:textColor="@color/bg_white" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Рекомендация заведения (ID3)"
+                android:textSize="12sp"
+                android:textColor="#BBCCDD"
+                android:layout_marginTop="2dp" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/btnCloseTree"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_gravity="top|end"
+            android:layout_margin="8dp"
+            android:text="✕"
+            android:textSize="18sp"
+            android:textColor="@color/bg_white"
+            android:gravity="center" />
+    </FrameLayout>
+
+    <!-- Вкладки -->
+    <com.google.android.material.tabs.TabLayout
+        android:id="@+id/tabLayout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/bg_white"
+        app:tabSelectedTextColor="@color/tsu_blue"
+        app:tabTextColor="@color/text_secondary"
+        app:tabIndicatorColor="@color/tsu_blue"
+        app:tabMode="fixed"
+        app:tabGravity="fill" />
+
+    <!-- ═══════════════ ВКЛАДКА 1: ОБУЧЕНИЕ ═══════════════ -->
+    <LinearLayout
+        android:id="@+id/panelTrain"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:visibility="visible">
+
+        <!-- Верхняя панель управления -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@color/bg_white"
+            android:padding="12dp"
+            android:elevation="2dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Обучающая выборка (CSV)"
+                android:textSize="12sp"
+                android:textColor="@color/text_secondary"
+                android:layout_marginBottom="4dp" />
+
+            <EditText
+                android:id="@+id/etCsv"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minLines="4"
+                android:maxLines="6"
+                android:scrollbars="vertical"
+                android:isScrollContainer="true"
+                android:inputType="textMultiLine"
+                android:textSize="11sp"
+                android:fontFamily="monospace"
+                android:textColor="@color/text_primary"
+                android:background="@color/bg_gray"
+                android:padding="8dp"
+                android:hint="location,budget,time_available,food_type,queue_tolerance,weather,recommended_place&#10;main_building,low,medium,full_meal,medium,good,neu_tsu_stolovaya" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="8dp">
+
+                <Button
+                    android:id="@+id/btnLoadSample"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="6dp"
+                    android:text="Образец"
+                    android:textSize="12sp"
+                    android:backgroundTint="@color/bg_gray"
+                    android:textColor="@color/text_primary" />
+
+                <Button
+                    android:id="@+id/btnTrain"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Обучить"
+                    android:textSize="12sp"
+                    android:backgroundTint="@color/tsu_blue"
+                    android:textColor="@color/bg_white" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/tvTrainStatus"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:textSize="12sp"
+                android:textColor="@color/tsu_blue_dark"
+                android:text="Дерево не обучено. Вставьте CSV и нажмите «Обучить»." />
+        </LinearLayout>
+
+        <!-- WebView для визуализации дерева -->
+        <WebView
+            android:id="@+id/webViewTree"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1" />
+    </LinearLayout>
+
+    <!-- ═══════════════ ВКЛАДКА 2: НАЙТИ МЕСТО ═══════════════ -->
+    <ScrollView
+        android:id="@+id/panelFind"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="12dp">
+
+            <!-- Спиннеры признаков -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="ГДЕ ВЫ НАХОДИТЕСЬ"
+                android:textSize="11sp"
+                android:textColor="@color/text_hint"
+                android:layout_marginBottom="2dp" />
+
+            <Spinner
+                android:id="@+id/spinnerLocation"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@color/bg_white"
+                android:padding="4dp"
+                android:layout_marginBottom="10dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="БЮДЖЕТ"
+                android:textSize="11sp"
+                android:textColor="@color/text_hint"
+                android:layout_marginBottom="2dp" />
+
+            <Spinner
+                android:id="@+id/spinnerBudget"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@color/bg_white"
+                android:padding="4dp"
+                android:layout_marginBottom="10dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="СКОЛЬКО ВРЕМЕНИ ЕСТЬ"
+                android:textSize="11sp"
+                android:textColor="@color/text_hint"
+                android:layout_marginBottom="2dp" />
+
+            <Spinner
+                android:id="@+id/spinnerTime"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@color/bg_white"
+                android:padding="4dp"
+                android:layout_marginBottom="10dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="ЧТО ХОЧЕТСЯ"
+                android:textSize="11sp"
+                android:textColor="@color/text_hint"
+                android:layout_marginBottom="2dp" />
+
+            <Spinner
+                android:id="@+id/spinnerFoodType"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@color/bg_white"
+                android:padding="4dp"
+                android:layout_marginBottom="10dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="ГОТОВЫ ЖДАТЬ ОЧЕРЕДЬ"
+                android:textSize="11sp"
+                android:textColor="@color/text_hint"
+                android:layout_marginBottom="2dp" />
+
+            <Spinner
+                android:id="@+id/spinnerQueue"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@color/bg_white"
+                android:padding="4dp"
+                android:layout_marginBottom="10dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="ПОГОДА"
+                android:textSize="11sp"
+                android:textColor="@color/text_hint"
+                android:layout_marginBottom="2dp" />
+
+            <Spinner
+                android:id="@+id/spinnerWeather"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@color/bg_white"
+                android:padding="4dp"
+                android:layout_marginBottom="16dp" />
+
+            <Button
+                android:id="@+id/btnFind"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Найти место"
+                android:backgroundTint="@color/tsu_blue"
+                android:textColor="@color/bg_white"
+                android:layout_marginBottom="16dp" />
+
+            <!-- Карточка результата -->
+            <LinearLayout
+                android:id="@+id/cardResult"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="@color/bg_white"
+                android:padding="16dp"
+                android:layout_marginBottom="12dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="РЕКОМЕНДУЕМ"
+                    android:textSize="11sp"
+                    android:textColor="@color/text_hint"
+                    android:layout_marginBottom="4dp" />
+
+                <TextView
+                    android:id="@+id/tvResult"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textSize="22sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/tsu_blue" />
+            </LinearLayout>
+
+            <!-- Путь по дереву -->
+            <LinearLayout
+                android:id="@+id/cardPath"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="@color/bg_white"
+                android:padding="16dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="ПУТЬ ПО ДЕРЕВУ"
+                    android:textSize="11sp"
+                    android:textColor="@color/text_hint"
+                    android:layout_marginBottom="8dp" />
+
+                <LinearLayout
+                    android:id="@+id/pathContainer"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical" />
+            </LinearLayout>
+
+        </LinearLayout>
+    </ScrollView>
+
+</LinearLayout>
