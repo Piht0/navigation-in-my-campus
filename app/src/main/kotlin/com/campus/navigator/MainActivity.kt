@@ -152,6 +152,7 @@ class MainActivity : AppCompatActivity() {
             seekZoom.progress = 25
         }
 
+        repo.seedIfEmpty()
         updateStatus("Нажмите на карту для установки начальной точки")
         loadFoodPointsFromRepo()
         loadLandmarks()
@@ -1347,8 +1348,12 @@ class MainActivity : AppCompatActivity() {
      * Добавляет каждую в MapData и обновляет карту.
      */
     private fun loadLandmarks() {
-        val json = getSharedPreferences("landmarks", MODE_PRIVATE)
-            .getString("data", null) ?: return
+        val prefs = getSharedPreferences("landmarks", MODE_PRIVATE)
+        if (!prefs.contains("data")) {
+            val seedJson = """[{"row":448,"col":624,"name":"museum of paleontology"},{"row":555,"col":639,"name":"museum of zoology"},{"row":544,"col":680,"name":"professor Belkin"},{"row":550,"col":711,"name":"Mendileev and Florinsky"},{"row":597,"col":727,"name":"Memorial to students who died in the Great Patriotic War"},{"row":601,"col":674,"name":"stone women"},{"row":528,"col":780,"name":"geophysical center of Eurasia"},{"row":606,"col":775,"name":"Potanin"},{"row":448,"col":731,"name":"reconciliation bench"},{"row":464,"col":693,"name":"stone womens"},{"row":226,"col":596,"name":"hospital square"},{"row":4,"col":503,"name":"amal Paris"},{"row":608,"col":349,"name":"student lake"},{"row":731,"col":403,"name":"tsu water tower"},{"row":699,"col":814,"name":"tsu library"},{"row":317,"col":734,"name":"breach through medical river"},{"row":210,"col":811,"name":"statue of mother"},{"row":433,"col":507,"name":"museum of forensic medicine"}]"""
+            prefs.edit().putString("data", seedJson).apply()
+        }
+        val json = prefs.getString("data", null) ?: return
         try {
             val arr = org.json.JSONArray(json)
             for (i in 0 until arr.length()) {
