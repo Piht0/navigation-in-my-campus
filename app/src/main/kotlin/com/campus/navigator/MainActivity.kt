@@ -16,101 +16,36 @@ import com.campus.navigator.data.*
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import kotlin.math.pow
 
-/**
- * Преобразует позицию SeekBar (0..50) в коэффициент масштаба.
- * Формула: 0.5 * 2^(p/25) — экспоненциальная шкала, при p=25 масштаб = 1.0.
- * Вынесена за пределы класса, так как не зависит от состояния Activity.
- */
 private fun progressToZoom(p: Int): Float = (0.5f * 2.0.pow(p / 25.0)).toFloat()
 
-/**
- * Главный экран приложения CampusNavigator.
- *
- * Отвечает за:
- *  - Инициализацию [MapData] и [FoodRepository] при старте.
- *  - Управление режимами редактирования карты (препятствия, проходы, точки питания).
- *  - Выбор начальной и конечной точки маршрута и запуск A*.
- *  - Открытие BottomSheet-меню для управления заведениями и блюдами.
- *  - CRUD-операции над заведениями и блюдами через AlertDialog.
- *  - Поиск заведений по выбранным блюдам и построение маршрута (ГА) в фоновом потоке.
- *
- * Наследует [AppCompatActivity] — необходимо для [BottomSheetDialog] из Material library.
- */
 class MainActivity : AppCompatActivity() {
 
     // ── Виджеты ───────────────────────────────────────────────────────────────
 
-    /** Кастомный View карты — центральный элемент UI. */
     private lateinit var mapView: MapView
-
-    /** Строка статуса — информирует пользователя о текущей операции. */
     private lateinit var tvStatus: TextView
-
-    /** Кнопка переключения слоя непроходимых клеток. */
     private lateinit var btnToggleImpassable: Button
-
-    /** Кнопка переключения сетки клеток. */
     private lateinit var btnToggleGrid: Button
-
-    /** Кнопка запуска поиска пути A*. */
     private lateinit var btnFindPath: Button
-
-    /** Кнопка очистки пути, маршрута и маркеров. */
     private lateinit var btnClear: Button
-
-    /** Кнопка переключения режима добавления препятствий. */
     private lateinit var btnAddObstacle: Button
-
-    /** Кнопка переключения режима добавления проходов. */
     private lateinit var btnAddPassage: Button
-
-    /** Кнопка сброса матрицы проходимости и точек питания к исходному состоянию. */
     private lateinit var btnResetGrid: Button
-
-    /** Кнопка переключения режима расстановки достопримечательностей. */
     private lateinit var btnAddLandmark: Button
-
-    /** Кнопка открытия BottomSheet-меню управления заведениями. */
     private lateinit var btnOpenFoodMenu: Button
-
-
-    /** Слайдер масштаба карты. */
     private lateinit var seekZoom: SeekBar
 
     // ── Состояние ─────────────────────────────────────────────────────────────
 
-    /**
-     * Репозиторий заведений и блюд (SharedPreferences + JSON).
-     * Инициализируется в onCreate — не может быть lateinit val из-за контекста.
-     */
     private lateinit var repo: FoodRepository
-
-    /**
-     * Фаза выбора точек маршрута: 0 = ожидание старта, 1 = ожидание финиша.
-     * Переключается при каждом тапе по проходимой клетке в режиме NONE.
-     */
     private var tapPhase = 0
-
-    /** Последнее значение масштаба от слайдера — нужно для вычисления относительного коэффициента. */
     private var lastSliderZoom = progressToZoom(25)
 
     // ── Кэш A* матрицы достопримечательностей ────────────────────────────────
 
-    /**
-     * Кэшированная матрица A* расстояний между всеми достопримечательностями.
-     * null = кэш недействителен или ещё считается.
-     * Инвалидируется при любом изменении списка достопримечательностей.
-     * @Volatile — читается и из фонового потока (ACO), и из UI-потока.
-     */
     @Volatile private var landmarkDistCache: LandmarkDistCache? = null
-
-    /**
-     * Фоновый поток вычисления A* матрицы.
-     * Хранится для возможности ожидания (join) в buildAcoRoute.
-     */
     @Volatile private var matrixComputeThread: Thread? = null
 
-    /** Контейнер кэша: снэппированные клетки + матрица расстояний. */
     private data class LandmarkDistCache(
         val snapStart: PathFinder.Cell,
         val snapLMs: List<PathFinder.Cell>,
@@ -120,17 +55,6 @@ class MainActivity : AppCompatActivity() {
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
-    /**
-     * Точка входа Activity.
-     * Порядок инициализации:
-     *  1. MapData.init — загрузка матрицы проходимости (из бинарного кэша или CSV).
-     *  2. FoodRepository — загрузка заведений из SharedPreferences.
-     *  3. setContentView — надувание layout.
-     *  4. bindViews — привязка виджетов по ID.
-     *  5. setupButtons, setupZoomSlider — назначение обработчиков.
-     *  6. Назначение колбэков MapView.
-     *  7. loadFoodPointsFromRepo — восстановление точек питания на карте.
-     */
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         MapData.init(this)
@@ -158,10 +82,6 @@ class MainActivity : AppCompatActivity() {
         loadLandmarks()
     }
 
-    /**
-     * Привязывает все виджеты layout к полям класса по их ID.
-     * Вызывается ровно один раз из onCreate после setContentView.
-     */
     private fun bindViews() {
         mapView             = findViewById(R.id.mapView)
         tvStatus            = findViewById(R.id.tvStatus)
@@ -179,11 +99,6 @@ class MainActivity : AppCompatActivity() {
 
     // ── Кнопки панели управления ──────────────────────────────────────────────
 
-    /**
-     * Назначает обработчики кликов всем кнопкам панели управления.
-     * Кнопки ADD_OBSTACLE и ADD_PASSAGE используют toggleEditMode для
-     * переключения режима с автоматическим изменением подписи.
-     */
     private fun setupButtons() {
         btnToggleImpassable.setOnClickListener {
             mapView.showImpassable = !mapView.showImpassable
@@ -208,11 +123,6 @@ class MainActivity : AppCompatActivity() {
         btnOpenFoodMenu.setOnClickListener { openFoodMenu() }
     }
 
-    /**
-     * Переключает режим редактирования: если [mode] уже активен — деактивирует его;
-     * иначе — сначала сбрасывает все режимы, затем включает [mode].
-     * Меняет текст [button] на [activeLabel] / [inactiveLabel].
-     */
     private fun toggleEditMode(mode: EditMode, button: Button, activeLabel: String, inactiveLabel: String) {
         if (mapView.editMode == mode) {
             mapView.editMode = EditMode.NONE; button.text = inactiveLabel
@@ -229,10 +139,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /**
-     * Сбрасывает все активные режимы редактирования в NONE
-     * и возвращает кнопкам исходные подписи.
-     */
     private fun deactivateAllModes() {
         btnAddObstacle.text = "Добавить препятствие"
         btnAddPassage.text  = "Добавить проход"
@@ -242,14 +148,6 @@ class MainActivity : AppCompatActivity() {
 
     // ── Обработка тапа по карте ───────────────────────────────────────────────
 
-    /**
-     * Вызывается MapView.onCellTapped при тапе в режиме NONE.
-     *
-     * Логика:
-     *  1. Если тапнули по точке питания — открывает диалог редактирования заведения.
-     *  2. Если клетка непроходима — показывает Toast.
-     *  3. Иначе — поочерёдно устанавливает startCell (tapPhase=0) и endCell (tapPhase=1).
-     */
     private fun handleMapTap(row: Int, col: Int) {
         if (mapView.editMode != EditMode.NONE) return
         val fp = MapData.getFoodPointAt(row, col)
@@ -272,11 +170,6 @@ class MainActivity : AppCompatActivity() {
 
     // ── Поиск пути ────────────────────────────────────────────────────────────
 
-    /**
-     * Запускает поиск пути A* и анимацию обхода.
-     * Вычисление выполняется мгновенно на главном потоке;
-     * визуализация (анимация посещённых клеток → итоговый путь) — через MapView.startPathAnimation().
-     */
     private fun findPath() {
         val s = mapView.startCell; val e = mapView.endCell
         if (s == null || e == null) {
@@ -284,18 +177,13 @@ class MainActivity : AppCompatActivity() {
         }
         val result = PathFinder.findPath(s, e)
         updateStatus(if (result.found) "Путь найден: ${result.path.size} ячеек" else "Путь не найден!")
-        // Октильное расстояние старт→финиш — управляет скоростью анимации:
-        // чем дальше точки, тем быстрее проигрывается анимация.
+        // Октильное расстояние старт→финиш — управляет скоростью анимации
         val dr = Math.abs(s.row - e.row).toFloat()
         val dc = Math.abs(s.col - e.col).toFloat()
         val dist = 1f * (dr + dc) + (1.4142f - 2f) * minOf(dr, dc)
         mapView.startPathAnimation(result.animEvents, result.path, dist)
     }
 
-    /**
-     * Очищает путь, маркеры, маршрут и подсветку точек питания.
-     * Сбрасывает tapPhase в 0 и скрывает кластерный слой.
-     */
     private fun clearPath() {
         mapView.cancelAnimation()
         mapView.currentPath = emptyList()
@@ -306,21 +194,12 @@ class MainActivity : AppCompatActivity() {
         updateStatus("Очищено")
     }
 
-    /**
-     * Сбрасывает пользовательские правки матрицы и точки питания в MapData,
-     * затем очищает визуальное состояние карты.
-     */
     private fun resetGrid() {
         MapData.resetGrid(); clearPath(); deactivateAllModes(); updateStatus("Матрица сброшена")
     }
 
     // ── Кластеризация ─────────────────────────────────────────────────────────
 
-    /**
-     * Запускает кластеризацию Union-Find по всем точкам питания на карте.
-     * Результат (назначения + центроиды) сохраняется в MapView для отрисовки зон.
-     * Требует минимум 2 точки.
-     */
     private fun runClustering() {
         val fps = MapData.getFoodPoints()
         if (fps.size < 2) {
@@ -339,10 +218,6 @@ class MainActivity : AppCompatActivity() {
         updateStatus(statusMsg)
     }
 
-    /**
-     * Возвращает правильную форму слова «кластер» для числа [n]
-     * согласно правилам русского склонения.
-     */
     private fun clusterWord(n: Int) = when {
         n % 100 in 11..19 -> "кластеров"
         n % 10 == 1        -> "кластер"
@@ -350,10 +225,6 @@ class MainActivity : AppCompatActivity() {
         else               -> "кластеров"
     }
 
-    /**
-     * Скрывает кластерные зоны и сбрасывает назначения кластеров.
-     * Вызывается при нажатии кнопки «✕ кластеры» на карте.
-     */
     private fun resetClusters() {
         mapView.showClusters = false
         mapView.clusterAssignments  = emptyMap()
@@ -363,11 +234,6 @@ class MainActivity : AppCompatActivity() {
 
     // ── Слайдер масштаба ──────────────────────────────────────────────────────
 
-    /**
-     * Подключает SeekBar к масштабированию карты.
-     * При изменении прогресса вычисляет относительный коэффициент (newZoom / lastSliderZoom)
-     * и передаёт его в [MapView.applyZoomFromCenter].
-     */
     private fun setupZoomSlider() {
         seekZoom.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(sb: SeekBar, progress: Int, fromUser: Boolean) {
@@ -383,11 +249,6 @@ class MainActivity : AppCompatActivity() {
 
     // ── Синхронизация с репозиторием ──────────────────────────────────────────
 
-    /**
-     * Загружает все заведения с флагом isOnMap=true из репозитория в MapData.
-     * Вызывается один раз при запуске, чтобы восстановить точки питания на карте
-     * после закрытия и повторного открытия приложения.
-     */
     private fun loadFoodPointsFromRepo() {
         repo.getAllOnMap().forEach { e ->
             MapData.addFoodPointFromDb(e.row, e.col, e.name, e.review, e.tags, e.id)
@@ -395,15 +256,6 @@ class MainActivity : AppCompatActivity() {
         mapView.invalidate()
     }
 
-    /**
-     * Синхронизирует действие пользователя (добавление/снятие точки питания в режиме
-     * ADD_FOOD_POINT) с репозиторием.
-     *
-     *  - Если [added]=true: вставляет новую запись или обновляет isOnMap=true для существующей.
-     *  - Если [added]=false: обновляет isOnMap=false (точка остаётся в репозитории скрытой).
-     *
-     * Сохраняет dbId обратно в MapData для последующих операций с репозиторием.
-     */
     private fun syncFoodPointToggle(row: Int, col: Int, added: Boolean) {
         if (added) {
             val existing = repo.getByCoords(row, col)
@@ -422,15 +274,6 @@ class MainActivity : AppCompatActivity() {
 
     // ── BottomSheet меню точек питания ────────────────────────────────────────
 
-    /**
-     * Открывает BottomSheetDialog с шестью действиями:
-     *  1. Добавить/убрать точку питания (переключить режим ADD_FOOD_POINT).
-     *  2. Запустить кластеризацию.
-     *  3. Открыть менеджер заведений.
-     *  4. Открыть менеджер блюд.
-     *  5. Поиск заведений по блюдам + построение маршрута.
-     *  6. Сбросить маршрут и подсветку.
-     */
     private fun openFoodMenu() {
         val sheet = BottomSheetDialog(this)
         val view  = layoutInflater.inflate(R.layout.bottom_sheet_food_menu, null)
@@ -474,10 +317,6 @@ class MainActivity : AppCompatActivity() {
         sheet.show()
     }
 
-    /**
-     * Включает или выключает режим размещения точек питания ADD_FOOD_POINT.
-     * При выключении возвращает editMode в NONE.
-     */
     private fun toggleFoodPointEditMode() {
         if (mapView.editMode == EditMode.ADD_FOOD_POINT) {
             mapView.editMode = EditMode.NONE
@@ -491,11 +330,6 @@ class MainActivity : AppCompatActivity() {
 
     // ── Диалог редактирования точки питания ──────────────────────────────────
 
-    /**
-     * Загружает данные заведения из MapData и репозитория, затем вызывает
-     * buildFoodPointDialog для отображения диалога редактирования.
-     * Если точка не найдена в MapData — ничего не делает.
-     */
     private fun showFoodPointEditDialog(row: Int, col: Int) {
         val fp     = MapData.getFoodPointAt(row, col) ?: return
         val entity = repo.getByCoords(row, col)
@@ -504,25 +338,6 @@ class MainActivity : AppCompatActivity() {
         buildFoodPointDialog(fp, entity, allDishes, linkedIds)
     }
 
-    /**
-     * Строит и показывает AlertDialog для редактирования заведения.
-     *
-     * Содержимое диалога:
-     *  - EditText: название, отзыв, теги.
-     *  - CheckBox для каждого блюда из справочника (отмечены привязанные).
-     *  - Сообщение «Блюда не созданы» если справочник пуст.
-     *  - Разделитель и красная кнопка «Удалить заведение полностью».
-     *
-     * Кнопки диалога:
-     *  - «Сохранить»: обновляет имя/отзыв/теги и список связанных блюд.
-     *  - «Убрать с карты»: скрывает точку (isOnMap=false), не удаляет из БД.
-     *  - «Отмена»: закрывает без изменений.
-     *
-     * @param fp        Точка питания из MapData (содержит row/col).
-     * @param entity    Запись заведения из репозитория (null если ещё не сохранена).
-     * @param allDishes Все блюда из справочника для формирования чекбоксов.
-     * @param linkedIds ID блюд, уже привязанных к данному заведению.
-     */
     private fun buildFoodPointDialog(
         fp: FoodPoint,
         entity: FoodPointData?,
@@ -649,21 +464,11 @@ class MainActivity : AppCompatActivity() {
 
     // ── Менеджер заведений ────────────────────────────────────────────────────
 
-    /**
-     * Загружает список всех заведений с блюдами из репозитория
-     * и открывает диалог-список.
-     */
     private fun openRestaurantManager() {
         val list = repo.getAllWithDishes()
         showRestaurantListDialog(list)
     }
 
-    /**
-     * Показывает AlertDialog со списком всех заведений.
-     * Клик по строке открывает меню действий для выбранного заведения.
-     * Для каждой строки показывает: значок (на карте/не на карте), название,
-     * список привязанных блюд.
-     */
     private fun showRestaurantListDialog(list: List<FoodPointWithDishesData>) {
         if (list.isEmpty()) {
             AlertDialog.Builder(this)
@@ -692,13 +497,6 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
-    /**
-     * Показывает контекстное меню действий для конкретного заведения [fwd]:
-     *  - Редактировать название/теги.
-     *  - Убрать с карты / Показать на карте (в зависимости от isOnMap).
-     *  - Привязать блюда.
-     *  - Удалить заведение полностью.
-     */
     private fun showRestaurantActionsDialog(fwd: FoodPointWithDishesData) {
         val fp    = fwd.foodPoint
         val name  = fp.name.ifBlank { "(${fp.row}, ${fp.col})" }
@@ -723,11 +521,6 @@ class MainActivity : AppCompatActivity() {
             .setNegativeButton("Назад", null).show()
     }
 
-    /**
-     * Открывает диалог редактирования текстовых метаданных заведения
-     * (название, отзыв, теги) без изменения позиции на карте.
-     * После сохранения обновляет данные и в репозитории, и в MapData.
-     */
     private fun showEditRestaurantMetaDialog(fp: FoodPointData) {
         val pad = (12 * resources.displayMetrics.density).toInt()
         val etName   = EditText(this).apply { hint = "Название"; setText(fp.name) }
@@ -751,12 +544,6 @@ class MainActivity : AppCompatActivity() {
             .setNegativeButton("Отмена", null).show()
     }
 
-    /**
-     * Переключает видимость заведения на карте.
-     * [show]=true: добавляет точку в MapData (если ещё нет) и обновляет repo.
-     * [show]=false: удаляет точку из MapData и обновляет repo.
-     * После операции повторно открывает менеджер заведений для обновления списка.
-     */
     private fun toggleRestaurantOnMap(fp: FoodPointData, show: Boolean) {
         repo.updateFoodPoint(fp.copy(isOnMap = show))
         if (show) {
@@ -770,11 +557,6 @@ class MainActivity : AppCompatActivity() {
         openRestaurantManager()
     }
 
-    /**
-     * Открывает диалог с множественным выбором для привязки/отвязки блюд к заведению [fp].
-     * Текущие привязки предварительно отмечены чекбоксами.
-     * При сохранении полностью перезаписывает список ссылок (clearLinks + insertLink).
-     */
     private fun showLinkDishesDialog(fp: FoodPointData, current: List<DishData>) {
         val all    = repo.getAllDishes()
         if (all.isEmpty()) {
@@ -796,10 +578,6 @@ class MainActivity : AppCompatActivity() {
             .setNegativeButton("Отмена", null).show()
     }
 
-    /**
-     * Запрашивает подтверждение перед полным удалением заведения [fp].
-     * При подтверждении удаляет точку из MapData и репозитория (включая все ссылки на блюда).
-     */
     private fun confirmDeleteRestaurant(fp: FoodPointData) {
         val name = fp.name.ifBlank { "(${fp.row}, ${fp.col})" }
         AlertDialog.Builder(this)
@@ -816,21 +594,10 @@ class MainActivity : AppCompatActivity() {
 
     // ── Менеджер блюд ─────────────────────────────────────────────────────────
 
-    /**
-     * Загружает список всех блюд из репозитория и открывает диалог управления.
-     */
     private fun openDishManager() {
         showDishManagerDialog(repo.getAllDishes())
     }
 
-    /**
-     * Строит и показывает диалог управления глобальным справочником блюд.
-     *
-     * Для каждого блюда рисует строку: название + кнопка «✎» (переименовать) + «✕» (удалить).
-     * Внизу — поле ввода и кнопка «Добавить блюдо».
-     *
-     * @param dishes Текущий список блюд из репозитория.
-     */
     private fun showDishManagerDialog(dishes: List<DishData>) {
         val d   = resources.displayMetrics.density.toInt()
         val pad = 12 * d
@@ -910,10 +677,6 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
-    /**
-     * Открывает диалог переименования блюда [dish].
-     * Не меняет ID и привязки — только имя в репозитории.
-     */
     private fun showRenameDishDialog(dish: DishData) {
         val pad = (12 * resources.displayMetrics.density).toInt()
         val et  = EditText(this).apply { setText(dish.name) }
@@ -930,10 +693,6 @@ class MainActivity : AppCompatActivity() {
 
     // ── Поиск по блюдам + маршрут ─────────────────────────────────────────────
 
-    /**
-     * Открывает BottomSheet для выбора блюд.
-     * Если справочник блюд пуст — показывает подсказку.
-     */
     private fun openDishSearch() {
         val dishes = repo.getAllDishes()
         if (dishes.isEmpty()) {
@@ -943,13 +702,6 @@ class MainActivity : AppCompatActivity() {
         showDishSearchSheet(dishes)
     }
 
-    /**
-     * Строит BottomSheetDialog для выбора блюд поиска.
-     * Каждое блюдо отображается чекбоксом. Кнопка «Найти заведения и построить маршрут»
-     * собирает выбранные ID и вызывает [searchAndBuildRoute].
-     *
-     * @param dishes Список блюд из репозитория.
-     */
     private fun showDishSearchSheet(dishes: List<DishData>) {
         val sheet = BottomSheetDialog(this)
         val d     = resources.displayMetrics.density.toInt()
@@ -999,13 +751,6 @@ class MainActivity : AppCompatActivity() {
         sheet.show()
     }
 
-    /**
-     * Выполняет поиск заведений с выбранными блюдами, фильтрует их для эффективного
-     * маршрута и запускает построение.
-     *
-     * Подсвечивает ВСЕ найденные заведения, но маршрут строит только по оптимальному
-     * подмножеству (результат [filterRestaurantsForRoute]).
-     */
     private fun searchAndBuildRoute(dishIds: List<Long>) {
         updateStatus("Поиск заведений...")
         val found = repo.findOnMapByDishIds(dishIds)
@@ -1026,29 +771,13 @@ class MainActivity : AppCompatActivity() {
         buildRoute(filtered)
     }
 
-    /**
-     * Отбирает оптимальное подмножество заведений для маршрута.
-     *
-     * Логика:
-     *  1. Для каждого заведения считает, сколько из выбранных блюд оно предлагает.
-     *  2. Сортирует по убыванию охвата блюд, затем по расстоянию до старта.
-     *  3. Жадно добавляет заведения, пока каждое блюдо не покрыто [maxPerDish] заведениями.
-     *
-     * Эффект: рестораны с несколькими выбранными блюдами идут первыми и закрывают
-     * сразу несколько слотов; чисто «кофейных» мест берётся не более [maxPerDish] ближайших.
-     *
-     * @param found       Все заведения, у которых есть хотя бы одно выбранное блюдо.
-     * @param dishIds     ID выбранных блюд.
-     * @param start       Стартовая клетка (row, col) — для сортировки по расстоянию.
-     * @param maxPerDish  Максимум заведений на одно блюдо (default = 3).
-     */
     private fun filterRestaurantsForRoute(
         found: List<FoodPointData>,
         dishIds: Set<Long>,
         start: Pair<Int, Int>,
         maxPerDish: Int = 3
     ): List<FoodPointData> {
-        if (found.size <= maxPerDish) return found   // слишком мало — фильтровать не нужно
+        if (found.size <= maxPerDish) return found
 
         // Заведение → подмножество выбранных блюд которые оно предлагает
         val restaurantDishes: Map<Long, Set<Long>> = found.associate { fp ->
@@ -1061,7 +790,7 @@ class MainActivity : AppCompatActivity() {
                 .thenBy { fp ->
                     val dr = (fp.row - start.first).toFloat()
                     val dc = (fp.col - start.second).toFloat()
-                    dr * dr + dc * dc   // евклидово²  — только для порядка, не для A*
+                    dr * dr + dc * dc
                 }
         )
 
@@ -1081,16 +810,6 @@ class MainActivity : AppCompatActivity() {
         return result
     }
 
-    /**
-     * Строит оптимальный маршрут обхода заведений [foodPoints] в фоновом потоке.
-     *
-     * Шаги:
-     *  1. Снэппит каждое заведение и стартовую клетку к ближайшей проходимой клетке
-     *     (nearestPassable) — заведения могут стоять внутри зданий.
-     *  2. Предвычисляет матрицу A* расстояний между всеми парами снэппированных точек.
-     *  3. Запускает ГА с реальными A* весами.
-     *  4. Строит отображаемый маршрут через findPathMulti — реальные проходимые ячейки.
-     */
     private fun buildRoute(foodPoints: List<FoodPointData>) {
         updateStatus("Вычисление A* матрицы расстояний...")
         val startPair = getStartCell()
@@ -1100,8 +819,7 @@ class MainActivity : AppCompatActivity() {
             val rawStart  = PathFinder.Cell(startPair.first, startPair.second)
 
             // ── Снэппинг всех точек на проходимые клетки ─────────────────────
-            // Заведения могут быть расставлены на стенах/зданиях — берём ближайшую
-            // проходимую клетку, чтобы A* мог работать от/до каждой точки.
+            // Заведения могут быть расставлены на стенах — берём ближайшую проходимую клетку
             val snapStart = PathFinder.nearestPassable(rawStart.row, rawStart.col) ?: rawStart
             val snapWPs   = foodPoints.map { fp ->
                 PathFinder.nearestPassable(fp.row, fp.col)
@@ -1141,7 +859,6 @@ class MainActivity : AppCompatActivity() {
             val orderedFP = ordered.mapNotNull { e -> MapData.getFoodPointAt(e.row, e.col) }
 
             // ── A* пути для отрисовки через findPathMulti ─────────────────────
-            // Порядок точек: snapStart → snapped[ordered[0]] → snapped[ordered[1]] → …
             val orderedSnapped = result.orderedIndices.map { snapWPs[it] }
             val pathCells = PathFinder.findPathMulti(snapStart, orderedSnapped)
 
@@ -1155,11 +872,6 @@ class MainActivity : AppCompatActivity() {
         }.start()
     }
 
-    /**
-     * Определяет стартовую клетку для маршрута ГА.
-     * Приоритет: startCell (выбранная пользователем) → GPS (заглушка) → центр карты.
-     * Настоящая геопривязка требует калибровки координат кампуса — оставлена как .
-     */
     private fun getStartCell(): Pair<Int, Int> {
         mapView.startCell?.let { return Pair(it.row, it.col) }
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)
@@ -1169,7 +881,7 @@ class MainActivity : AppCompatActivity() {
                 try {
                     @Suppress("MissingPermission")
                     lm.getLastKnownLocation(prov)?.let {
-                        //  заменить на реальные координаты кампуса для геопривязки
+                        // заменить на реальные координаты кампуса для геопривязки
                         return Pair(MapData.ROWS / 2, MapData.COLS / 2)
                     }
                 } catch (_: Exception) { }
@@ -1180,10 +892,6 @@ class MainActivity : AppCompatActivity() {
 
     // ── ACO маршрут по достопримечательностям ────────────────────────────────
 
-    /**
-     * Показывает диалог выбора достопримечательностей (чекбоксы).
-     * После подтверждения запускает ACO только по выбранным точкам.
-     */
     private fun showLandmarkSelectionDialog() {
         val all = MapData.getLandmarks()
         if (all.isEmpty()) {
@@ -1214,12 +922,6 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
-    /**
-     * Запускает фоновое вычисление полной A* матрицы для ВСЕХ достопримечательностей.
-     * Вызывается сразу после загрузки/изменения списка, чтобы к моменту нажатия
-     * кнопки ACO матрица уже была готова в памяти.
-     * Если предыдущий поток ещё работает — прерывает его и начинает заново.
-     */
     private fun precomputeLandmarkMatrix() {
         val landmarks = MapData.getLandmarks()
         landmarkDistCache = null
@@ -1266,11 +968,6 @@ class MainActivity : AppCompatActivity() {
         t.start()
     }
 
-    /**
-     * Запускает ACO для выбранных достопримечательностей.
-     * Если матрица ещё считается — ждёт её завершения (join), затем сразу запускает ACO.
-     * Если кэш готов — запускает ACO мгновенно без пересчёта.
-     */
     private fun buildAcoRoute(selected: List<Landmark>) {
         val allLandmarks = MapData.getLandmarks()
         updateStatus("Подготовка ACO (выбрано ${selected.size} из ${allLandmarks.size})...")
@@ -1325,11 +1022,6 @@ class MainActivity : AppCompatActivity() {
 
     // ── Персистентность достопримечательностей ────────────────────────────────
 
-    /**
-     * Сохраняет все достопримечательности в SharedPreferences как JSON-массив.
-     * Формат: [{"row":123,"col":456,"name":"Фонтан"}, ...]
-     * Вызывается при каждом изменении (добавление, удаление, переименование).
-     */
     private fun saveLandmarks() {
         val arr = org.json.JSONArray()
         MapData.getLandmarks().forEach { lm ->
@@ -1343,10 +1035,6 @@ class MainActivity : AppCompatActivity() {
             .edit().putString("data", arr.toString()).apply()
     }
 
-    /**
-     * Загружает достопримечательности из SharedPreferences при старте приложения.
-     * Добавляет каждую в MapData и обновляет карту.
-     */
     private fun loadLandmarks() {
         val prefs = getSharedPreferences("landmarks", MODE_PRIVATE)
         if (!prefs.contains("data")) {
@@ -1371,10 +1059,6 @@ class MainActivity : AppCompatActivity() {
 
     // ── Достопримечательности ─────────────────────────────────────────────────
 
-    /**
-     * Показывает список всех достопримечательностей.
-     * Клик по строке — центрирует камеру на объекте и открывает диалог редактирования.
-     */
     private fun showLandmarkListDialog() {
         val landmarks = MapData.getLandmarks()
         if (landmarks.isEmpty()) {
@@ -1399,10 +1083,6 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
-    /**
-     * Диалог редактирования достопримечательности: изменить название или удалить.
-     * Название хранится в памяти (MapData.Landmark.name).
-     */
     private fun showLandmarkEditDialog(row: Int, col: Int) {
         val lm = MapData.getLandmarkAt(row, col) ?: return
         val pad = (12 * resources.displayMetrics.density).toInt()
@@ -1440,8 +1120,8 @@ class MainActivity : AppCompatActivity() {
         }
         dialog.show()
     }
+
     // ── Вспомогательный метод ─────────────────────────────────────────────────
 
-    /** Обновляет текст статусной строки. Вызывается только на главном потоке. */
     private fun updateStatus(msg: String) { tvStatus.text = msg }
 }

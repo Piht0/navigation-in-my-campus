@@ -8,7 +8,7 @@ object GeneticRouteSolver {
     private const val TOURNAMENT_K    = 5
     private const val PROGRESS_EVERY  = 30
 
-    data class Result(
+    data class Result(так
         val orderedIndices: List<Int>,
         val totalDistanceCells: Float
     )

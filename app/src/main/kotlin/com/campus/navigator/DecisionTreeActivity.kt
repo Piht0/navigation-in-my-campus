@@ -10,21 +10,7 @@ import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.tabs.TabLayout
 
-/**
- * Экран "Дерево решений" — рекомендация заведения по алгоритму ID3.
- *
- * Вкладка 1 «Обучение»:
- *   - EditText для вставки обучающей выборки в формате CSV
- *   - Кнопка «Образец» — загружает decision_tree_sample.csv из assets
- *   - Кнопка «Обучить» — парсит CSV, строит ID3-дерево, показывает статус
- *   - WebView — HTML-визуализация построенного дерева
- *
- * Вкладка 2 «Найти место»:
- *   - Спиннеры для всех 6 признаков (значения берутся из обучающей выборки)
- *   - Кнопка «Найти» — прогоняет выбранные признаки по дереву
- *   - Карточка с результатом (название заведения)
- *   - Список шагов пути по узлам дерева
- */
+
 class DecisionTreeActivity : AppCompatActivity() {
 
     private lateinit var vm: DecisionTreeViewModel

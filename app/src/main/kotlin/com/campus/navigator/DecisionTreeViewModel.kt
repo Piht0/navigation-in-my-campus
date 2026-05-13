@@ -3,13 +3,7 @@ package com.campus.navigator
 import android.content.Context
 import kotlin.math.sqrt
 
-/**
- * Хранит состояние модуля "Дерево решений": обученное дерево, датасет,
- * методы загрузки/парсинга CSV, генерации HTML-визуализации и предсказания.
- *
- * Персистентность: датасет сохраняется в SharedPreferences (ключ "decision_tree_dataset").
- * При создании автоматически загружает сохранённый датасет и переобучает дерево.
- */
+
 class DecisionTreeViewModel(private val context: Context) {
 
     companion object {
@@ -47,10 +41,7 @@ class DecisionTreeViewModel(private val context: Context) {
 
     // ── Загрузка и обучение ───────────────────────────────────────────────────
 
-    /**
-     * Парсит CSV, обучает ID3, сохраняет датасет.
-     * @return Строка-статус для отображения пользователю.
-     */
+
     fun loadAndTrain(csvText: String): String {
         val parsed = parseCSV(csvText)
         if (parsed.isEmpty()) return "Ошибка: не удалось прочитать данные. Проверьте формат CSV."
@@ -76,27 +67,13 @@ class DecisionTreeViewModel(private val context: Context) {
 
     // ── Предсказание ─────────────────────────────────────────────────────────
 
-    /**
-     * Прогоняет входные признаки по дереву.
-     * @return Пара (заведение, путь по узлам) или null если дерево не обучено.
-     */
+
     fun predict(input: Map<String, String>): Pair<String, List<String>>? =
         tree?.let { ID3Algorithm.predict(it, input) }
 
     // ── Динамический расчёт location ─────────────────────────────────────────
 
-    /**
-     * Вычисляет категорию location для заданной клетки карты
-     * на основе центроидов K-means кластеров.
-     *
-     * Находит ближайший кластер к позиции студента, затем определяет
-     * среднее расстояние до кластеров заведений:
-     *   close  = ближайший кластер с расстоянием ≤ 150 клеток
-     *   medium = 150–300 клеток
-     *   far    = > 300 клеток
-     *
-     * Если кластеры не рассчитаны — возвращает null.
-     */
+
     fun calcLocation(studentRow: Int, studentCol: Int, centroids: List<Pair<Float, Float>>): String? {
         if (centroids.isEmpty()) return null
         val nearest = centroids.minByOrNull { (r, c) ->

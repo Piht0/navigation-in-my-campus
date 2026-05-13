@@ -5,16 +5,7 @@ import android.widget.Button
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 
-/**
- * Экран распознавания рукописных цифр (0–9).
- *
- * Пользователь рисует цифру на сетке 5×5 пальцем, затем нажимает «Распознать».
- * Нейросеть [DigitRecognizer] (25 → 32 → 10, обученная на MNIST) выдаёт
- * предсказание и уверенность.
- *
- * Веса загружаются из assets/digit_weights.json, который генерирует
- * скрипт train_model_export.py.
- */
+
 class DigitActivity : AppCompatActivity() {
 
     private lateinit var drawView:      DigitDrawView

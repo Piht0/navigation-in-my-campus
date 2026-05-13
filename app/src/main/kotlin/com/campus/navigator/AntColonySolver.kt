@@ -125,7 +125,7 @@ object AntColonySolver {
             // Если вероятности нулевые, выбираем рандом из не посещенных
             val list = mutableListOf<Int>()
             for (i in probs.indices) {
-                if (probs[i] >= 0) list.add(i)
+                if (probs[i] > 0) list.add(i)
             }
             return if (list.isNotEmpty()) list[rnd.nextInt(list.size)] else 0
         }

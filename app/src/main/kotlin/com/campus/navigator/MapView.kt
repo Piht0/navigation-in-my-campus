@@ -8,35 +8,12 @@ import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
 
-/**
- * Режим редактирования карты, активный в данный момент.
- *
- *  - NONE          — обычный режим (тап открывает меню точки или выбирает клетку для маршрута);
- *  - ADD_OBSTACLE  — тап переключает проходимость клетки в «непроходима»;
- *  - ADD_PASSAGE   — тап переключает проходимость клетки в «проходима»;
- *  - ADD_FOOD_POINT — тап добавляет / убирает точку питания на карте.
- */
+
 enum class EditMode {
     NONE, ADD_OBSTACLE, ADD_PASSAGE, ADD_FOOD_POINT, ADD_LANDMARK
 }
 
-/**
- * Кастомный View для отображения карты кампуса и взаимодействия с ней.
- *
- * Возможности:
- *  - Отображение растровой подложки (campus_map.png) с масштабированием под экран.
- *  - Отрисовка сетки клеток, непроходимых зон, изменённых клеток.
- *  - Визуализация пути A* и посещённых клеток.
- *  - Круги точек питания с цветами кластеров.
- *  - Маршрут (полилиния + номера) и подсветка результатов поиска по блюдам.
- *  - Зоны кластеров (blob-заливка) с кнопкой сброса.
- *  - Жесты: одним пальцем — перетаскивание, двумя — масштабирование + перемещение.
- *  - Тап-детекция: в режиме NONE — сначала проверяет попадание в круг точки питания
- *    (радиус 5 клеток), затем — обычную клетку.
- *
- * Координатная система: в canvas-пространстве (mapBitmap coords).
- * Matrix / invertMatrix — преобразование экранных координат ↔ bitmap-координаты.
- */
+
 class MapView @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
@@ -49,10 +26,7 @@ class MapView @JvmOverloads constructor(
     var showGrid = false
         set(value) { field = value; invalidate() }
 
-    /**
-     * Показывать ли слой непроходимых клеток (красная заливка).
-     * При первом включении запускает фоновую сборку impassableBitmap.
-     */
+
     var showImpassable = false
         set(value) {
             field = value
@@ -94,11 +68,7 @@ class MapView @JvmOverloads constructor(
 
     private val clusterGroups = HashMap<Int, MutableList<Pair<Int, Int>>>()
 
-    /**
-     * Множество ID кластеров-одиночек (аутлайеры: точки, которые слишком далеко
-     * от всех остальных и не вошли ни в одну группу). Такие точки питания
-     * отрисовываются оранжевым цветом, а их blob-зона не рисуется.
-     */
+
     var clusterSingletonIds: Set<Int> = emptySet()
         set(value) { field = value; invalidate() }
 
@@ -114,52 +84,28 @@ class MapView @JvmOverloads constructor(
     /** Колбэк: вызывается при нажатии кнопки «✕ кластеры». */
     var onResetClusters: (() -> Unit)? = null
 
-    /**
-     * Колбэк: вызывается когда матрица трансформации сбрасывается в resetMatrixToFit
-     * (например при изменении размера View). MainActivity использует его для синхронизации
-     * SliderBar с фактическим масштабом после сброса.
-     */
+
     var onMatrixReset: (() -> Unit)? = null
 
-    /**
-     * A* пути маршрута заведений — ячейки реального пути обхода (с учётом матрицы
-     * проходимости). Рисуется жёлтыми клетками вместо прямых линий.
-     */
+
     var routeAStarPath: List<PathFinder.Cell> = emptyList()
         set(value) { field = value; invalidate() }
 
-    /**
-     * A* пути маршрута ACO по достопримечательностям.
-     * Рисуется светло-зелёными клетками, отдельно от маршрута заведений.
-     */
     var landmarkAStarPath: List<PathFinder.Cell> = emptyList()
         set(value) { field = value; invalidate() }
 
-    /**
-     * Достопримечательности в порядке обхода ACO — для нумерованных маркеров.
-     */
+
     var routeLandmarks: List<Landmark> = emptyList()
         set(value) { field = value; invalidate() }
 
-    /**
-     * Колбэк при добавлении (added=true) или удалении (added=false)
-     * точки питания в режиме ADD_FOOD_POINT.
-     * Используется в MainActivity для синхронизации с FoodRepository.
-     */
+
     var onFoodPointToggled: ((row: Int, col: Int, added: Boolean) -> Unit)? = null
 
-    /**
-     * Упорядоченный список точек питания для отрисовки маршрута:
-     * полилиния соединяет центры кругов в порядке списка,
-     * каждая точка получает номер (1, 2, 3 …).
-     */
+
     var routeFoodPoints: List<FoodPoint> = emptyList()
         set(value) { field = value; invalidate() }
 
-    /**
-     * Координаты точек питания, найденных поиском по блюду.
-     * Вокруг каждой из них рисуется жёлтое кольцо-подсветка.
-     */
+
     var highlightedFoodPoints: Set<Pair<Int, Int>> = emptySet()
         set(value) { field = value; invalidate() }
 
@@ -171,29 +117,16 @@ class MapView @JvmOverloads constructor(
     /** Runnable текущего кадра анимации; null когда анимация не идёт. */
     private var animRunnable: Runnable? = null
 
-    /**
-     * Упакованный массив событий OPEN/CLOSE, полученный из PathResult.animEvents.
-     * Пустой когда анимация не запускалась или была сброшена.
-     * Кодировка: event ≥ 0 → OPEN (ячейка добавлена в frontier), idx = event;
-     *            event < 0  → CLOSE (ячейка перешла в closed),    idx = -event - 1.
-     */
+
     private var animEvents: IntArray = IntArray(0)
 
     /** Индекс следующего события в [animEvents] для обработки. */
     private var animEventIdx = 0
 
-    /**
-     * Ячейки, находящиеся в данный момент в открытом списке A* (frontier).
-     * Рисуются оранжевым — «рассматриваются прямо сейчас».
-     * При получении CLOSE-события ячейка удаляется из этого множества.
-     */
+
     private val animFrontierCells = HashSet<PathFinder.Cell>(1024)
 
-    /**
-     * Ячейки, уже обработанные A* (закрытый список).
-     * Рисуются голубым — «уже выбраны и проверены».
-     * Накапливается по мере воспроизведения CLOSE-событий.
-     */
+
     private val animClosedCells = ArrayList<PathFinder.Cell>(1024)
 
     /** Итоговый путь, который показывается после завершения анимации обхода. */
@@ -201,10 +134,7 @@ class MapView @JvmOverloads constructor(
 
     // ── Цвета кластеров ───────────────────────────────────────────────────────
 
-    /**
-     * Палитра из 11 цветов для кластерных зон и кругов точек питания.
-     * Индекс цвета = ID кластера. При числе кластеров > 11 цвета повторяются.
-     */
+
     val clusterColors = listOf(
         Color.rgb(160, 30, 220),  // фиолетовый
         Color.rgb(30, 110, 220),  // синий
@@ -364,26 +294,15 @@ class MapView @JvmOverloads constructor(
     /** Растровая подложка карты кампуса, загружается из R.drawable.campus_map. */
     private var mapBitmap: Bitmap? = null
 
-    /**
-     * Матрица трансформации «bitmap → экран»: содержит текущее смещение и масштаб.
-     * Изменяется при жестах перетаскивания и масштабирования.
-     */
+
     private val matrix = Matrix()
 
-    /**
-     * Обратная матрица «экран → bitmap».
-     * Пересчитывается каждый раз при изменении [matrix].
-     * Используется для перевода координат тапа в координаты клетки.
-     */
+
     private val invertMatrix = Matrix()
 
     // ── Кэш непроходимых клеток ───────────────────────────────────────────────
 
-    /**
-     * Битмап непроходимых клеток, строится один раз в фоновом потоке.
-     * @Volatile — гарантирует видимость между UI-потоком и рабочим потоком.
-     * null до завершения построения.
-     */
+
     @Volatile private var impassableBitmap: Bitmap? = null
 
     /** Флаг, предотвращающий запуск нескольких параллельных потоков построения. */
@@ -391,10 +310,7 @@ class MapView @JvmOverloads constructor(
 
     // ── Переменные состояния жестов ───────────────────────────────────────────
 
-    /**
-     * Координаты последней позиции пальца — для вычисления дельты при перетаскивании.
-     * lastTouchX/Y обновляются в ACTION_MOVE; touchDownX/Y — в ACTION_DOWN для детектирования тапа.
-     */
+
     private var lastTouchX = 0f; private var lastTouchY = 0f
 
     /** Расстояние между двумя пальцами в начале щипка — базис для масштабирования. */
@@ -403,10 +319,7 @@ class MapView @JvmOverloads constructor(
     /** true, если пользователь сейчас касается экрана двумя пальцами. */
     private var isMultiTouch = false
 
-    /**
-     * Середина между двумя пальцами при щипке — центр масштабирования.
-     * Обновляется в каждом ACTION_MOVE для корректного двойного жеста (pinch + pan).
-     */
+
     private var midPointX = 0f; private var midPointY = 0f
 
     /** Координаты начала касания — для определения, был ли жест тапом (< TAP_THRESHOLD пикселей). */
@@ -415,17 +328,10 @@ class MapView @JvmOverloads constructor(
     /** Максимальное смещение пальца (px), при котором жест считается тапом, а не перетаскиванием. */
     private val TAP_THRESHOLD = 12f
 
-    /**
-     * true, если в текущем касании уже было нарисовано хотя бы одно препятствие/проход
-     * в режиме ADD_OBSTACLE / ADD_PASSAGE.  Используется в ACTION_UP, чтобы не вызывать
-     * handleTap (который бы переключил только одну клетку) после завершения мазка.
-     */
+
     private var isPainting = false
 
-    /**
-     * Последняя клетка, обработанная в режиме рисования (row, col).
-     * Предотвращает многократное изменение одной и той же клетки при медленном движении пальца.
-     */
+
     private var lastPaintedCell: Pair<Int, Int>? = null
 
     /** Интервал между кадрами анимации A* (мс). 16 мс ≈ 60 fps. */
@@ -445,12 +351,7 @@ class MapView @JvmOverloads constructor(
 
     // ── Построение кэша непроходимых клеток ──────────────────────────────────
 
-    /**
-     * Строит bitmap непроходимых клеток в отдельном потоке.
-     * Итерирует базовую матрицу и закрашивает красным все непроходимые клетки.
-     * По завершении вызывает post{invalidate()} для обновления UI.
-     * Защищён от повторного запуска флагом impassableBitmapBuilding.
-     */
+
     private fun buildImpassableBitmapAsync() {
         if (impassableBitmapBuilding) return
         impassableBitmapBuilding = true
@@ -478,11 +379,7 @@ class MapView @JvmOverloads constructor(
 
     // ── Загрузка bitmap подложки ──────────────────────────────────────────────
 
-    /**
-     * Загружает растровую подложку карты из ресурсов с автоматическим уменьшением (inSampleSize).
-     * Если изображение > 2048 пикселей по любой стороне — сжимает вдвое до укладки в лимит.
-     * Использует RGB_565 для экономии памяти (2 байта/пиксель вместо 4).
-     */
+
     private fun loadMapBitmap() {
         try {
             val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
@@ -497,24 +394,15 @@ class MapView @JvmOverloads constructor(
         } catch (_: Exception) { } catch (_: OutOfMemoryError) { }
     }
 
-    // ── Размер и матрица ──────────────────────────────────────────────────────
+    // ── Размер и матрица
 
-    /**
-     * Вызывается при изменении размера View (поворот экрана, первый layout-проход).
-     * Перезадаёт матрицу трансформации под новый размер и при необходимости
-     * запускает построение impassableBitmap.
-     */
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
         resetMatrixToFit(w, h)
         if (showImpassable && impassableBitmap == null) buildImpassableBitmapAsync()
     }
 
-    /**
-     * Сбрасывает матрицу так, чтобы изображение карты занимало максимальное место
-     * в View без выхода за его границы (aspect-fit), с центрированием.
-     * Пересчитывает invertMatrix для последующего перевода координат.
-     */
+
     private fun resetMatrixToFit(vw: Int, vh: Int) {
         matrix.reset()
         val bmp = mapBitmap
@@ -538,12 +426,7 @@ class MapView @JvmOverloads constructor(
     /** Высота одной клетки в пикселях bitmap-пространства. */
     private fun getCellH(): Float = (mapBitmap?.height?.toFloat() ?: MapData.ROWS.toFloat()) / MapData.ROWS
 
-    /**
-     * Возвращает прямоугольник видимой области в координатах клеток.
-     * Преобразует углы экрана через invertMatrix в bitmap-координаты
-     * и делит на размер клетки. Ограничивает результат размерами карты.
-     * Используется для отрисовки только видимых клеток — оптимизация производительности.
-     */
+
     private fun getVisibleRect(cw: Float, ch: Float): Rect {
         val pts = floatArrayOf(0f, 0f, width.toFloat(), height.toFloat())
         invertMatrix.mapPoints(pts)
@@ -557,23 +440,7 @@ class MapView @JvmOverloads constructor(
 
     // ── Отрисовка ─────────────────────────────────────────────────────────────
 
-    /**
-     * Главный метод отрисовки View. Вызывается системой при каждом invalidate().
-     *
-     * Порядок слоёв (снизу вверх):
-     *  1. Растровая подложка карты.
-     *  2. Слой непроходимых клеток (impassableBitmap).
-     *  3. Изменённые пользователем клетки (зелёные проходы / красные препятствия).
-     *  4. Посещённые A* клетки (голубые).
-     *  5. Путь A* (жёлтые клетки).
-     *  6. Сетка клеток (если включена).
-     *  7. Зоны кластеров (blob-заливка через saveLayer).
-     *  8. Круги точек питания (большой + маленький центр).
-     *  9. Кольца-подсветки результатов поиска по блюдам.
-     * 10. Полилиния маршрута + номера точек.
-     * 11. Маркеры старта и финиша пути.
-     * 12. Overlay: кнопка сброса кластеров (в экранных координатах — вне canvas.save/restore).
-     */
+
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         canvas.save()
@@ -720,11 +587,7 @@ class MapView @JvmOverloads constructor(
 
     // ── Вспомогательные методы отрисовки ─────────────────────────────────────
 
-    /**
-     * Рисует кнопку «✕ кластеры» в экранных координатах (без matrix).
-     * Позиция: вертикально по центру экрана, у левого края.
-     * Сохраняет прямоугольник в [resetBtnRect] для hit-test в onTouchEvent.
-     */
+
     private fun drawResetClustersButton(canvas: Canvas) {
         val btnTop = height / 2f - resetBtnH / 2f
         resetBtnRect.set(resetBtnLeft, btnTop, resetBtnLeft + resetBtnW, btnTop + resetBtnH)
@@ -739,16 +602,7 @@ class MapView @JvmOverloads constructor(
         )
     }
 
-    /**
-     * Рисует зоны кластеров как «пятна» (blob) — наложение кругов одного цвета
-     * через saveLayer с общей прозрачностью [CLUSTER_ZONE_ALPHA].
-     * Использует минимальный ограничивающий прямоугольник + радиус пятна для
-     * задания области saveLayer, избегая полного-экранного слоя.
-     *
-     * @param canvas Canvas в bitmap-пространстве (трансформация уже применена).
-     * @param cw     Ширина клетки в пикселях bitmap.
-     * @param ch     Высота клетки в пикселях bitmap.
-     */
+
     // Пересобирает группы при изменении clusterAssignments
     private fun rebuildClusterGroups() {
         clusterGroups.clear()
@@ -780,11 +634,7 @@ class MapView @JvmOverloads constructor(
         }
     }
 
-    /**
-     * Рисует круглый маркер (начальная/конечная точка пути) с белой обводкой.
-     *
-     * @param paint Заливка маркера (зелёный для старта, красный для финиша).
-     */
+
     private fun drawMarker(canvas: Canvas, cell: PathFinder.Cell, paint: Paint, cw: Float, ch: Float) {
         val cx = (cell.col + 0.5f) * cw; val cy = (cell.row + 0.5f) * ch
         val r = minOf(cw, ch) * 0.45f
@@ -793,15 +643,7 @@ class MapView @JvmOverloads constructor(
 
     // ── Обработка касаний ─────────────────────────────────────────────────────
 
-    /**
-     * Обрабатывает все жесты касания:
-     *  - ACTION_DOWN: запоминает точку начала для детектирования тапа и перетаскивания.
-     *  - ACTION_POINTER_DOWN: активирует multitouch-режим, фиксирует расстояние между пальцами.
-     *  - ACTION_MOVE: перетаскивание одним пальцем (postTranslate) или масштабирование двумя
-     *    (postScale вокруг середины пальцев + postTranslate для pan).
-     *  - ACTION_UP: если смещение < TAP_THRESHOLD — обрабатывает тап.
-     *  - ACTION_POINTER_UP: завершает multitouch, сохраняет позицию оставшегося пальца.
-     */
+
     override fun onTouchEvent(event: MotionEvent): Boolean {
         val isPaintMode = editMode == EditMode.ADD_OBSTACLE || editMode == EditMode.ADD_PASSAGE
         when (event.actionMasked) {
@@ -866,25 +708,7 @@ class MapView @JvmOverloads constructor(
         return true
     }
 
-    /**
-     * Запускает пошаговую анимацию обхода A* на основе событийного потока.
-     *
-     * Алгоритм:
-     *  1. Сбрасывает предыдущую анимацию и текущий путь.
-     *  2. Вычисляет batchSize автоматически по расстоянию [distanceHint]:
-     *     чем дальше старт от финиша, тем больше событий обрабатывается за кадр
-     *     (анимация ускоряется, чтобы не затягиваться на длинных маршрутах).
-     *     Дополнительно ограничивает общее время анимации 5 секундами.
-     *  3. Каждые [ANIM_DELAY_MS] мс обрабатывает batchSize событий:
-     *     OPEN-событие — добавляет ячейку в [animFrontierCells] (оранжевый);
-     *     CLOSE-событие — перемещает ячейку из frontier в [animClosedCells] (голубой).
-     *  4. По завершении всех событий делает паузу [ANIM_PATH_DELAY_MS]
-     *     и отображает итоговый путь.
-     *
-     * @param animEvents   Массив OPEN/CLOSE событий из PathResult.animEvents.
-     * @param finalPath    Итоговый путь, показывается после анимации.
-     * @param distanceHint Октильное расстояние старт→финиш (управляет скоростью).
-     */
+
     fun startPathAnimation(
         animEvents: IntArray,
         finalPath: List<PathFinder.Cell>,
@@ -943,10 +767,7 @@ class MapView @JvmOverloads constructor(
         animHandler.post(animRunnable!!)
     }
 
-    /**
-     * Останавливает текущую анимацию A* и сбрасывает её состояние.
-     * Вызывается при повторном поиске, очистке или смене режима.
-     */
+
     fun cancelAnimation() {
         animRunnable?.let { animHandler.removeCallbacks(it) }
         animRunnable = null
@@ -956,26 +777,14 @@ class MapView @JvmOverloads constructor(
         animClosedCells.clear()
     }
 
-    /**
-     * Применяет масштабирование из центра View (используется SeekBar в MainActivity).
-     * Пересчитывает invertMatrix и вызывает перерисовку.
-     *
-     * @param factor Коэффициент масштабирования (>1 = увеличение, <1 = уменьшение).
-     */
+
     fun applyZoomFromCenter(factor: Float) {
         matrix.postScale(factor, factor, width / 2f, height / 2f)
         matrix.invert(invertMatrix)
         invalidate()
     }
 
-    /**
-     * Перемещает камеру так, чтобы клетка (row, col) оказалась в центре экрана.
-     * Текущий масштаб не меняется — только трансляция.
-     * Вызывается при выборе заведения из списка.
-     *
-     * @param row Строка клетки на карте.
-     * @param col Столбец клетки на карте.
-     */
+
     fun centerOnCell(row: Int, col: Int) {
         val cw = getCellW()
         val ch = getCellH()
@@ -991,12 +800,7 @@ class MapView @JvmOverloads constructor(
 
     // ── Рисование мазком ─────────────────────────────────────────────────────
 
-    /**
-     * Закрашивает клетку под экранными координатами (sx, sy) в режиме
-     * ADD_OBSTACLE (делает непроходимой) или ADD_PASSAGE (делает проходимой).
-     * Повторные вызовы для одной и той же клетки пропускаются — [lastPaintedCell]
-     * гарантирует, что каждая клетка меняется ровно один раз за мазок.
-     */
+
     private fun paintCellAt(sx: Float, sy: Float) {
         val pts = floatArrayOf(sx, sy); invertMatrix.mapPoints(pts)
         val cw  = getCellW(); val ch = getCellH()
@@ -1015,20 +819,7 @@ class MapView @JvmOverloads constructor(
 
     // ── Логика тапа ───────────────────────────────────────────────────────────
 
-    /**
-     * Обрабатывает одиночный тап по карте.
-     *
-     * 1. Переводит экранные координаты в bitmap-координаты через invertMatrix.
-     * 2. Делит на размер клетки для получения (row, col).
-     * 3. В зависимости от editMode:
-     *    - ADD_OBSTACLE/ADD_PASSAGE: переключает проходимость клетки.
-     *    - ADD_FOOD_POINT: добавляет или убирает точку питания, вызывает onFoodPointToggled.
-     *    - NONE: сначала проверяет попадание в круг точки питания (радиус 5 клеток),
-     *            затем вызывает onCellTapped с координатами точки питания или обычной клетки.
-     *
-     * @param sx Экранная X-координата тапа.
-     * @param sy Экранная Y-координата тапа.
-     */
+
     private fun handleTap(sx: Float, sy: Float) {
         val pts = floatArrayOf(sx, sy); invertMatrix.mapPoints(pts)
         val bx = pts[0]; val by = pts[1]
@@ -1078,12 +869,6 @@ class MapView @JvmOverloads constructor(
             }
         }
     }
-
-    /**
-     * Вычисляет расстояние между двумя точками касания (для определения масштаба при щипке).
-     *
-     * @param e MotionEvent с как минимум двумя активными указателями.
-     */
     private fun pointerDist(e: MotionEvent): Float {
         val dx = e.getX(0) - e.getX(1); val dy = e.getY(0) - e.getY(1)
         return Math.sqrt((dx * dx + dy * dy).toDouble()).toFloat()

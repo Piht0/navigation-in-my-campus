@@ -8,15 +8,7 @@ import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
 
-/**
- * Сетка 5×5 для рисования цифры пальцем.
- *
- * Пользователь нажимает/ведёт пальцем — клетки переключаются.
- * Закрашенная клетка = 0.0 (штрих цифры), чистая = 1.0 (фон) —
- * формат соответствует обучающей нормализации train_model_export.py.
- *
- * Колбэк [onGridChanged] вызывается после каждого изменения сетки.
- */
+
 class DigitDrawView @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null
@@ -129,10 +121,7 @@ class DigitDrawView @JvmOverloads constructor(
         onGridChanged?.invoke()
     }
 
-    /**
-     * Возвращает массив GRID*GRID float для подачи в [DigitRecognizer.predict].
-     * Закрашенная клетка → 1.0 (цифра), пустая → 0.0 (фон).
-     */
+
     fun getPixels(): FloatArray {
         val pixels = FloatArray(GRID * GRID)
         for (r in 0 until GRID) {

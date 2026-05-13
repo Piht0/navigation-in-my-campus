@@ -4,26 +4,15 @@ import android.content.Context
 import org.json.JSONArray
 import org.json.JSONObject
 
-/**
- * Простая нейросеть для распознавания цифр.
- * Веса подгружаются из digit_weights.json в папке assets.
- */
 object DigitRecognizer {
 
-    /** Размер сетки (берётся из JSON, должен совпадать с DigitDrawView.GRID). */
     var gridSize: Int = 5
         private set
 
-    /** Список слоёв: каждый слой — пара (weights матрица, bias вектор). */
     private val layers = mutableListOf<Pair<Array<FloatArray>, FloatArray>>()
 
     val isReady: Boolean get() = layers.isNotEmpty()
 
-    /**
-     * Загружает веса из assets/digit_weights.json.
-     * Формат JSON: {"grid": 8, "layers": [{"w": [[...]], "b": [...]}, ...]}
-     * Безопасно вызывать повторно — повторная загрузка игнорируется.
-     */
     fun init(context: Context) {
         if (isReady) return
         try {
@@ -46,11 +35,6 @@ object DigitRecognizer {
         }
     }
 
-    /**
-     * Распознаёт цифру.
-     * @param pixels массив пикселей: 1.0 = нарисовано, 0.0 = пусто
-     * @return Пара (цифра, уверенность)
-     */
     fun predict(pixels: FloatArray): Pair<Int, Float>? {
         if (!isReady) return null
 
@@ -72,7 +56,6 @@ object DigitRecognizer {
 
     // ── Математика ────────────────────────────────────────────────────────────
 
-    /** Линейный слой: out[j] = sum_i(x[i] * w[i][j]) + b[j] */
     private fun dense(x: FloatArray, w: Array<FloatArray>, b: FloatArray): FloatArray {
         val out = FloatArray(b.size)
         for (j in b.indices) {
@@ -83,14 +66,12 @@ object DigitRecognizer {
         return out
     }
 
-    /** Dense + ReLU */
     private fun denseRelu(x: FloatArray, w: Array<FloatArray>, b: FloatArray): FloatArray {
         val out = dense(x, w, b)
         for (i in out.indices) if (out[i] < 0f) out[i] = 0f
         return out
     }
 
-    /** Numerically stable softmax */
     private fun softmax(logits: FloatArray): FloatArray {
         val max = logits.maxOrNull() ?: 0f
         val exp = FloatArray(logits.size) { Math.exp((logits[it] - max).toDouble()).toFloat() }
